@@ -1,0 +1,1 @@
+make a calculator using python backend in fastapi and frontend in html css java

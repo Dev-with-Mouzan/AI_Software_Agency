@@ -1,0 +1,12 @@
+# Netlify configuration template for the frontend static build.
+[build]
+  command = "cd frontend && npm install && npm run build"
+  publish = "frontend/.next"
+
+[build.environment]
+  NEXT_PUBLIC_API_URL = "https://api.example.com/api"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

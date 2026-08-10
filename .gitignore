@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!deployment/secrets/.gitkeep
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Databases & runtime data
+*.sqlite
+*.sqlite3
+*.db
+projects/*/artifacts/
+projects/.index/
+knowledge/.index/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local data dirs created at runtime
+data/
+runs/
+.agent_state/

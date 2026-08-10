@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MECHANICA · Precision Calculator</title>
+  <meta name="description" content="MECHANICA — a precision arithmetic instrument. Safe expression evaluation over a whitelisted AST engine.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="stage" id="stage">
+    <div class="machine-wrap">
+      <main class="machine" id="machine" aria-label="MECHANICA precision calculator">
+
+        <header class="machine-header">
+          <div class="wordmark">
+            <h1>MECHANICA</h1>
+            <span class="wordmark-sub">Precision Arithmetic Instrument · Serial 001</span>
+          </div>
+          <div class="link-status" id="linkStatus" title="Checking API link…" role="status">
+            <span class="led led-checking" id="linkLed" aria-hidden="true"></span>
+            <span class="link-label" id="linkLabel">LINK</span>
+          </div>
+        </header>
+
+        <section class="display-module" aria-label="Display">
+          <div class="display">
+            <div class="register register-acc">
+              <span class="reg-tag">ACC</span>
+              <span class="reg-value" id="displayEntry" aria-hidden="true">·</span>
+            </div>
+            <output class="register register-disp" aria-live="polite" aria-label="Result">
+              <span class="reg-tag">DISP</span>
+              <span class="reg-value" id="displayResult">0</span>
+            </output>
+          </div>
+          <div class="status-line" id="statusLine" role="status" aria-live="assertive"></div>
+        </section>
+
+        <section class="keypad-wrap" aria-label="Keypad">
+          <div class="keypad-functions" id="functionKeys" aria-label="Math functions"></div>
+
+          <div class="keypad-numeric" aria-label="Numbers and operators">
+            <button class="key key-util" data-action="paren-open" data-value="(" aria-label="open parenthesis">(</button>
+            <button class="key key-util" data-action="paren-close" data-value=")" aria-label="close parenthesis">)</button>
+            <button class="key key-util" data-action="back" aria-label="backspace">⌫</button>
+            <button class="key key-util key-clear" data-action="clear" aria-label="clear all">C</button>
+
+            <button class="key key-digit" data-action="digit" data-value="7" aria-label="seven">7</button>
+            <button class="key key-digit" data-action="digit" data-value="8" aria-label="eight">8</button>
+            <button class="key key-digit" data-action="digit" data-value="9" aria-label="nine">9</button>
+            <button class="key key-op" data-action="op" data-value="/" aria-label="divide">÷</button>
+
+            <button class="key key-digit" data-action="digit" data-value="4" aria-label="four">4</button>
+            <button class="key key-digit" data-action="digit" data-value="5" aria-label="five">5</button>
+            <button class="key key-digit" data-action="digit" data-value="6" aria-label="six">6</button>
+            <button class="key key-op" data-action="op" data-value="*" aria-label="multiply">×</button>
+
+            <button class="key key-digit" data-action="digit" data-value="1" aria-label="one">1</button>
+            <button class="key key-digit" data-action="digit" data-value="2" aria-label="two">2</button>
+            <button class="key key-digit" data-action="digit" data-value="3" aria-label="three">3</button>
+            <button class="key key-op" data-action="op" data-value="-" aria-label="subtract">−</button>
+
+            <button class="key key-digit" data-action="digit" data-value="0" aria-label="zero">0</button>
+            <button class="key key-digit" data-action="digit" data-value="." aria-label="decimal point">.</button>
+            <button class="key key-util" data-action="digit" data-value="," aria-label="comma">,</button>
+            <button class="key key-op" data-action="op" data-value="+" aria-label="add">+</button>
+
+            <button class="key key-util" data-action="op" data-value="%" aria-label="modulo">%</button>
+            <button class="key key-equals" data-action="eval" aria-label="equals">=</button>
+          </div>
+        </section>
+
+        <footer class="machine-footer">
+          <span>Safe engine · whitelisted AST — no eval</span>
+          <span class="api-ref" id="apiRef">API · …</span>
+        </footer>
+      </main>
+    </div>
+
+    <aside class="tape-panel" aria-label="Calculation history">
+      <header class="tape-header">
+        <div class="tape-title">
+          <h2>TAPE</h2>
+          <span class="tape-count" id="tapeCount">0 ENTRIES</span>
+        </div>
+        <button class="tape-clear" id="clearTapeBtn" aria-label="clear calculation history">✕ Clear tape</button>
+      </header>
+      <div class="tape" id="tape" tabindex="0" aria-label="Calculation history tape">
+        <div class="tape-empty" id="tapeEmpty">Tape is blank — press <kbd>=</kbd> to print a line.</div>
+      </div>
+    </aside>
+  </div>
+
+  <noscript>
+    <p class="noscript">MECHANICA needs JavaScript to drive the registers and the tape. Please enable it.</p>
+  </noscript>
+
+  <script src="js/script.js"></script>
+</body>
+</html>

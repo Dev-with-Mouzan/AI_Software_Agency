@@ -1,0 +1,13 @@
+# Render blueprint template. The DevOps agent adapts service names/ports to the project.
+services:
+  - type: web
+    name: ai-agency
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt || pip install uvicorn fastapi
+    startCommand: uvicorn agency.api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false

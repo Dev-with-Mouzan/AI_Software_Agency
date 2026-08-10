@@ -1,0 +1,55 @@
+"""Declarative base, mixins and shared column helpers for SQLAlchemy models."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+
+from sqlalchemy import DateTime, String
+from sqlalchemy.dialects.postgresql import UUID as PgUUID
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator
+
+
+def utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+class GUID(TypeDecorator[uuid.UUID]):
+    """Portable UUID type that stores as native UUID on Postgres and string on SQLite."""
+
+    impl = String(36)
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(PgUUID(as_uuid=True))
+        return dialect.type_descriptor(String(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        return str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, uuid.UUID):
+            return value
+        return uuid.UUID(str(value))
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class UUIDPkMixin:
+    """Adds a string-UUID primary key plus created/updated timestamps."""
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )

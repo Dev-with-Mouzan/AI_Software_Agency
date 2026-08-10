@@ -1,0 +1,18 @@
+# AWS CodeBuild buildspec template: build image, push to ECR, deploy ECS.
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+  pre_build:
+    commands:
+      - echo Build started on `date`
+      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
+  build:
+    commands:
+      - docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/ai-agency:$IMAGE_TAG .
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/ai-agency:$IMAGE_TAG
+  post_build:
+    commands:
+      - aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment

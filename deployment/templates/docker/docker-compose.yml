@@ -1,0 +1,13 @@
+# docker-compose template for local + single-host deployment.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./app.db}
+    env_file:
+      - .env
+    restart: unless-stopped

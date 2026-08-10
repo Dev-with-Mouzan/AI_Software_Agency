@@ -1,0 +1,113 @@
+[project]
+name = "ai-agency"
+version = "0.1.0"
+description = "Agentic AI Software Agency — specialized AI employees collaborating under human supervision."
+readme = "../README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "AI Software Agency" }]
+keywords = ["ai", "agents", "multi-agent", "llm", "saas", "project-management"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.32,<1.0",
+    "pydantic>=2.9,<3.0",
+    "pydantic-settings>=2.6,<3.0",
+    "sqlalchemy>=2.0,<3.0",
+    "alembic>=1.14,<2.0",
+    "asyncpg>=0.30,<1.0",
+    "psycopg[binary]>=3.2,<4.0",
+    "aiosqlite>=0.20,<1.0",
+    "pgvector>=0.3,<1.0",
+    "redis>=5.2,<7.0",
+    "celery>=5.4,<6.0",
+    "httpx>=0.27,<1.0",
+    "duckduckgo-search>=7.0",
+    "python-multipart>=0.0.18,<1.0",
+    "structlog>=24.4,<26.0",
+    "pyyaml>=6.0,<7.0",
+    "tenacity>=9.0,<10.0",
+    "prometheus-client>=0.21,<1.0",
+    "jinja2>=3.1,<4.0",
+]
+
+[project.optional-dependencies]
+# LLM providers (install at least one)
+llm = [
+    "openai>=1.55,<2.0",
+    "anthropic>=0.40,<1.0",
+    "google-generativeai>=0.8,<1.0",
+    "langchain-core>=0.3,<2.0",
+    "langchain-openai>=0.2,<1.0",
+]
+# LangGraph + LangChain orchestration layer
+graph = [
+    "langgraph>=0.2,<2.0",
+    "langchain-core>=0.3,<2.0",
+]
+# OpenTelemetry observability
+observability = [
+    "opentelemetry-api>=1.28,<2.0",
+    "opentelemetry-sdk>=1.28,<2.0",
+    "opentelemetry-instrumentation-fastapi>=0.49b0,<1.0",
+]
+# Development tooling
+dev = [
+    "pytest>=8.3,<9.0",
+    "pytest-asyncio>=0.24,<1.0",
+    "pytest-cov>=5.0,<7.0",
+    "ruff>=0.8,<1.0",
+    "mypy>=1.13,<2.0",
+]
+
+[project.scripts]
+agency-api = "agency.api.main:run"
+agency-init-db = "scripts.init_db:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agency*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["agency/tests"]
+addopts = "-q --cov=agency --cov-report=term-missing --cov-fail-under=0"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["agency", "scripts", "tests"]
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["B008", "SIM117", "UP042", "RUF012", "E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agency", "scripts", "tests"]
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+warn_unused_configs = true
+check_untyped_defs = true
+disallow_any_generics = false
+ignore_missing_imports = true
+exclude = ["alembic/versions"]
+
+[tool.coverage.run]
+source = ["agency"]
+omit = ["*/tests/*", "*/alembic/*"]
+
+[tool.pydantic-mypy]
+init_typed = true
+warn_required_dynamic_aliases = true

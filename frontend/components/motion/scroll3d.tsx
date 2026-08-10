@@ -1,0 +1,126 @@
+"use client";
+
+import { useRef, type ReactNode } from "react";
+import {
+  motion,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+  useTransform,
+} from "motion/react";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+interface ScrollTilt3DProps {
+  children: ReactNode;
+  className?: string;
+  /** Degrees of tilt across the scroll — enters tilted, straightens in the middle, leaves tilted. */
+  max?: number;
+  /** Rotation axis. */
+  axis?: "x" | "y";
+  /** Perspective depth in px (lower = stronger 3D). */
+  perspective?: number;
+  /** Fade near the edges of the viewport. */
+  fade?: boolean;
+}
+
+/**
+ * Scroll-driven 3D tilt. As the element travels through the viewport it
+ * rotates in perspective — unfolding flat in the middle — which gives a
+ * modern "panels rise out of the page" feel.
+ */
+export function ScrollTilt3D({
+  children,
+  className,
+  max = 6,
+  axis = "x",
+  perspective = 1100,
+  fade = true,
+}: ScrollTilt3DProps) {
+  const reduced = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"],
+  });
+
+  const rotate = useTransform(scrollYProgress, [0, 0.5, 1], [max, 0, -max]);
+  const springRotate = useSpring(rotate, { stiffness: 80, damping: 22 });
+  const scale = useTransform(scrollYProgress, [0, 0.5, 1], [0.95, 1, 0.95]);
+  const opacity = useTransform(
+    scrollYProgress,
+    [0, 0.12, 0.88, 1],
+    fade ? [0.6, 1, 1, 0.6] : [1, 1, 1, 1],
+  );
+
+  const rotation = reduced ? 0 : springRotate;
+  const style =
+    axis === "x" ? { rotateX: rotation } : { rotateY: rotation };
+
+  return (
+    <div style={{ perspective }} className="relative">
+      <motion.div
+        ref={ref}
+        style={{ ...style, scale, opacity, transformStyle: "preserve-3d" }}
+        className={className}
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
+}
+
+interface ScrollOpen3DProps {
+  children: ReactNode;
+  className?: string;
+  /** Degrees to swing open from (edge toward the viewer). */
+  from?: number;
+  /** Which edge opens toward the viewer. */
+  side?: "left" | "right";
+  /** Perspective depth in px. */
+  perspective?: number;
+}
+
+/**
+ * 3D "swing open" entrance. The card starts rotated on the Y axis so one
+ * edge faces the viewer, then eases flat as it scrolls into view — like
+ * panels hinged to the center column.
+ */
+export function ScrollOpen3D({
+  children,
+  className,
+  from = 14,
+  side = "left",
+  perspective = 1000,
+}: ScrollOpen3DProps) {
+  const reduced = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"],
+  });
+
+  const start = side === "left" ? from : -from;
+  const rotateY = useTransform(scrollYProgress, [0, 0.32], [start, 0]);
+  const springY = useSpring(rotateY, { stiffness: 90, damping: 22 });
+  const scale = useTransform(scrollYProgress, [0, 0.32], [0.94, 1]);
+  const opacity = useTransform(scrollYProgress, [0, 0.2, 0.32], [0, 1, 1]);
+
+  return (
+    <div style={{ perspective }} className="relative h-full">
+      <motion.div
+        ref={ref}
+        style={{
+          rotateY: reduced ? 0 : springY,
+          scale: reduced ? 1 : scale,
+          opacity,
+          transformStyle: "preserve-3d",
+          transition: reduced ? undefined : `opacity 0.3s ${EASE}`,
+        }}
+        className={className}
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
+}

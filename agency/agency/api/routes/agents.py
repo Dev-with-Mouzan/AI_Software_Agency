@@ -1,0 +1,101 @@
+"""Agent endpoints: registry status, runtime info, command runs."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, HTTPException
+
+from agency.agents.registry import get_registry
+from agency.api.deps import DbSession
+from agency.api.routes.workflows import serialize_workflow_run
+from agency.schemas.agent import AgentOut, AgentRunRequest, AgentRuntimeOut
+from agency.schemas.workflow import WorkflowRunOut
+from agency.services.projects import project_service
+from agency.workflows.engine import WorkflowError, workflow_engine
+
+router = APIRouter(prefix="/agents", tags=["agents"])
+
+
+@router.post("/run", response_model=WorkflowRunOut, status_code=201)
+async def run_agents(payload: AgentRunRequest, session: DbSession) -> WorkflowRunOut:
+    """Run an ordered list of agents against a project (sequential)."""
+    if payload.project_id:
+        project = await project_service.get(session, payload.project_id)
+        if project is None:
+            raise HTTPException(404, "project not found")
+    try:
+        run = await workflow_engine.start_command_run(
+            session,
+            project_id=payload.project_id,
+            agents=payload.agents,
+            command=payload.command,
+            extra={
+                "platform": payload.platform,
+                "plan_source": payload.plan_source,
+            },
+            actor="human",
+        )
+    except WorkflowError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return await serialize_workflow_run(session, run)
+
+
+@router.get("", response_model=list[AgentOut])
+async def list_agents(session: DbSession) -> list[AgentOut]:
+    registry = get_registry()
+    await registry.seed(session)
+    from sqlalchemy import select
+
+    from agency.db.models import AgentRecord
+    from agency.services import settings as settings_service
+
+    records = list(
+        (await session.scalars(select(AgentRecord).order_by(AgentRecord.created_at))).all()
+    )
+    out: list[AgentOut] = []
+    for r in records:
+        provider, model = settings_service.effective_agent_route(r.kind)
+        out.append(
+            AgentOut.model_validate(
+                {
+                    **r.__dict__,
+                    "llm_provider": provider,
+                    "llm_model": model,
+                }
+            )
+        )
+    return out
+
+
+@router.get("/runtime", response_model=list[AgentRuntimeOut])
+async def agents_runtime(session: DbSession) -> list[AgentRuntimeOut]:
+    registry = get_registry()
+    statuses = await registry.status(session)
+    return [
+        AgentRuntimeOut(
+            kind=s["kind"],
+            name=s["name"],
+            status=s["status"],
+            short_term=s["short_term"],
+            stats={"tools_available": s["tools_available"]},
+        )
+        for s in statuses
+    ]
+
+
+@router.get("/{kind}/runtime", response_model=AgentRuntimeOut)
+async def agent_runtime(kind: str, session: DbSession) -> AgentRuntimeOut:
+    registry = get_registry()
+    agent = registry.get(kind)
+    if agent is None:
+        raise HTTPException(404, f"unknown agent kind: {kind}")
+    statuses = await registry.status(session)
+    match = next((s for s in statuses if s["kind"] == kind), None)
+    if match is None:
+        raise HTTPException(404, "agent record not found")
+    return AgentRuntimeOut(
+        kind=kind,
+        name=match["name"],
+        status=match["status"],
+        short_term=match["short_term"],
+        stats={"tools_available": match["tools_available"]},
+    )

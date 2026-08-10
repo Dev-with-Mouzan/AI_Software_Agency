@@ -1,0 +1,408 @@
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ */
+/*  Design tokens — "Signal deck"                                      */
+/*  Deep mission-control surfaces + electric signal-teal accent.       */
+/* ------------------------------------------------------------------ */
+
+@theme {
+  --color-bg: #0a0d14;
+  --color-surface: #10141d;
+  --color-surface-2: #151a26;
+  --color-surface-3: #1c2331;
+  --color-edge: #232b3d;
+  --color-edge-soft: #1a2130;
+
+  --color-primary: #2fe6ce;
+  --color-primary-hover: #6bf0df;
+  --color-primary-soft: rgba(47, 230, 206, 0.12);
+  --color-primary-ink: #04201b;
+  --color-accent: #5b8cff;
+  --color-accent-soft: rgba(91, 140, 255, 0.12);
+  --color-accent-ink: #ffffff;
+
+  --color-success: #3ecf8e;
+  --color-success-soft: rgba(62, 207, 142, 0.12);
+  --color-success-ink: #04211a;
+  --color-warning: #f6b84b;
+  --color-warning-soft: rgba(246, 184, 75, 0.12);
+  --color-warning-ink: #241703;
+  --color-danger: #f26868;
+  --color-danger-soft: rgba(242, 104, 104, 0.12);
+  --color-danger-ink: #220707;
+  --color-info: #63b3ff;
+  --color-info-soft: rgba(99, 179, 255, 0.12);
+  --color-info-ink: #041222;
+
+  --color-muted: #8a97ad;
+  --color-faint: #55627a;
+  --color-text: #edf2f7;
+  --color-text-dim: #aab6cc;
+  --color-ring: #2fe6ce;
+  --color-selected: rgba(47, 230, 206, 0.08);
+  --color-overlay: rgba(3, 5, 10, 0.6);
+
+  --font-sans:
+    "Instrument Sans", "Inter", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Sora", "Instrument Sans", sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo,
+    Consolas, monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  --shadow-panel:
+    0 1px 2px rgba(2, 4, 8, 0.4), 0 10px 30px -12px rgba(0, 0, 0, 0.55);
+  --shadow-pop:
+    0 12px 40px -8px rgba(0, 0, 0, 0.65), 0 24px 80px -16px rgba(0, 0, 0, 0.75);
+  --shadow-glow:
+    0 0 0 1px rgba(47, 230, 206, 0.18), 0 10px 44px -8px rgba(47, 230, 206, 0.32);
+}
+
+.light {
+  --color-bg: #f6f7fb;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef1f7;
+  --color-surface-3: #e6eaf2;
+  --color-edge: #d8dee8;
+  --color-edge-soft: #e8ecf3;
+
+  --color-primary: #0064d2;
+  --color-primary-hover: #0050aa;
+  --color-primary-soft: rgba(0, 100, 210, 0.1);
+  --color-primary-ink: #ffffff;
+  --color-accent: #e5323d;
+  --color-accent-soft: rgba(229, 50, 61, 0.1);
+  --color-accent-ink: #ffffff;
+
+  --color-success: #1d9a4a;
+  --color-success-soft: rgba(29, 154, 74, 0.1);
+  --color-success-ink: #ffffff;
+  --color-warning: #a97e00;
+  --color-warning-soft: rgba(169, 126, 0, 0.12);
+  --color-warning-ink: #ffffff;
+  --color-danger: #e5323d;
+  --color-danger-soft: rgba(229, 50, 61, 0.08);
+  --color-danger-ink: #ffffff;
+  --color-info: #3665f3;
+  --color-info-soft: rgba(54, 101, 243, 0.1);
+  --color-info-ink: #ffffff;
+
+  --color-muted: #5b6472;
+  --color-faint: #8b94a5;
+  --color-text: #0d1421;
+  --color-text-dim: #38445a;
+  --color-ring: #0064d2;
+  --color-selected: rgba(0, 100, 210, 0.08);
+  --color-overlay: rgba(23, 28, 40, 0.45);
+
+  --shadow-panel:
+    0 1px 2px rgba(13, 20, 33, 0.05), 0 10px 30px -12px rgba(13, 20, 33, 0.12);
+  --shadow-pop:
+    0 12px 40px -8px rgba(13, 20, 33, 0.2), 0 24px 80px -16px rgba(13, 20, 33, 0.22);
+  --shadow-glow:
+    0 0 0 1px rgba(0, 100, 210, 0.15), 0 10px 36px -10px rgba(0, 100, 210, 0.25);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-edge);
+  }
+
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  html {
+    font-size: 105%;
+  }
+
+  ::selection {
+    background: var(--color-primary-soft);
+    color: var(--color-text);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-edge-soft);
+    border-radius: 8px;
+    border: 2px solid var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-edge);
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font-family: inherit;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Keyframes                                                          */
+/* ------------------------------------------------------------------ */
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+  50% {
+    transform: translateY(-14px) translateX(6px);
+  }
+}
+
+@keyframes drift-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(40px, -30px, 0) scale(1.15);
+  }
+}
+
+@keyframes drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-50px, 30px, 0) scale(0.9);
+  }
+}
+
+/* Rising particles — drift from the bottom of the orbit upward */
+@keyframes rise-up {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.8;
+  }
+  85% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-72px);
+    opacity: 0;
+  }
+}
+
+@keyframes orbit-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes orbit-spin-reverse {
+  from { transform: rotate(360deg); }
+  to   { transform: rotate(0deg); }
+}
+
+/* Counter-spin so chip icons stay upright while the ring container orbits */
+@keyframes counter-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+@keyframes counter-spin-reverse {
+  from { transform: rotate(-360deg); }
+  to   { transform: rotate(0deg); }
+}
+
+/* Slow pulse for orbit ring glow */
+@keyframes ring-glow-pulse {
+  0%, 100% { opacity: 0.35; }
+  50%       { opacity: 0.75; }
+}
+
+/* Conic sweep for orbit ring accent dot */
+@keyframes ring-dot-orbit {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Node card pop-in */
+@keyframes node-pop {
+  0%   { transform: scale(0.7) translateY(6px); opacity: 0; }
+  70%  { transform: scale(1.06) translateY(-1px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes ping-slow {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  75%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes grid-fade {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 52px 52px;
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Fine engineering grid used in hero surfaces */
+  .bg-grid {
+    background-image:
+      linear-gradient(
+        to right,
+        color-mix(in srgb, var(--color-primary) 7%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--color-primary) 7%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 26px 26px;
+  }
+
+  /* Drifting aurora blobs (hero backdrop) */
+  .aurora-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(80px);
+    will-change: transform;
+    pointer-events: none;
+  }
+
+  .animate-drift-a {
+    animation: drift-a 16s ease-in-out infinite;
+  }
+  .animate-drift-b {
+    animation: drift-b 20s ease-in-out infinite;
+  }
+  .animate-float {
+    animation: float 7s ease-in-out infinite;
+  }
+  .animate-rise {
+    animation: rise-up 7s ease-in-out infinite;
+  }
+  .animate-orbit-spin {
+    animation: orbit-spin 48s linear infinite;
+  }
+  .animate-orbit-spin-reverse {
+    animation: orbit-spin-reverse 36s linear infinite;
+  }
+  /* Counter-spin utilities so node icons stay upright */
+  .animate-counter-spin {
+    animation: counter-spin 48s linear infinite;
+  }
+  .animate-counter-spin-reverse {
+    animation: counter-spin-reverse 36s linear infinite;
+  }
+  .animate-ring-glow {
+    animation: ring-glow-pulse 3s ease-in-out infinite;
+  }
+  .animate-node-pop {
+    animation: node-pop 0.55s cubic-bezier(0.34,1.56,0.64,1) both;
+  }
+  .animate-ping-slow {
+    animation: ping-slow 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+  .animate-grid-fade {
+    animation: grid-fade 2.4s linear infinite;
+  }
+
+  .animate-shimmer {
+    background-image: linear-gradient(
+      100deg,
+      transparent 20%,
+      color-mix(in srgb, var(--color-text) 6%, transparent) 50%,
+      transparent 80%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+
+  .animate-pulse-dot {
+    animation: pulse-dot 1.6s ease-in-out infinite;
+  }
+
+  /* Gradient text for hero accents */
+  .text-gradient {
+    background: linear-gradient(
+      100deg,
+      var(--color-primary) 0%,
+      var(--color-accent) 55%,
+      var(--color-info) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .glass {
+    background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+    backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
