@@ -109,3 +109,14 @@ class NotificationOut(ORMModel):
     body: str
     read: bool
     created_at: datetime
+
+
+class AuditLogOut(ORMModel):
+    id: UUID
+    actor: str
+    action: str
+    resource_type: str
+    resource_id: str
+    allowed: bool
+    detail: dict
+    created_at: datetime

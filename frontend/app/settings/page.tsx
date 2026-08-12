@@ -212,25 +212,16 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        center
         eyebrow="Connect"
         title="Settings"
-        description="Connect an AI provider and tell the agency which models each specialist should use. Keys stay on your machine."
-        actions={
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={resetAll} disabled={!dirty || saving}>
-              <RotateCcw className="h-4 w-4" /> Discard
-            </Button>
-            <Button onClick={handleSave} loading={saving} disabled={!dirty}>
-              <Check className="h-4 w-4" /> Save changes
-            </Button>
-          </div>
-        }
+        description="Connect an AI provider and tell DevPilot which models each specialist should use. Keys stay on your machine."
       />
 
       {/* Status strip */}
       <div
         className={cn(
-          "flex items-center gap-3 rounded-xl border px-4 py-3",
+          "flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-4 py-3",
           configured
             ? "border-success/30 bg-success/10 text-success"
             : "border-warning/30 bg-warning/10 text-warning",
@@ -379,7 +370,7 @@ export default function SettingsPage() {
                     label="API key"
                     hint={
                       st?.has_key
-                        ? "Leave blank to keep the existing key."
+                        ? "Clear the key and save to remove it."
                         : "Paste your key to connect this provider."
                     }
                   >
@@ -388,7 +379,10 @@ export default function SettingsPage() {
                         type={d.show_key ? "text" : "password"}
                         value={d.api_key}
                         onChange={(e) =>
-                          setProvider(p.id, { api_key: e.target.value, clear_key: false })
+                          setProvider(p.id, {
+                            api_key: e.target.value,
+                            clear_key: e.target.value === "",
+                          })
                         }
                         placeholder={
                           st?.has_key ? "••••••••••••••••" : "sk-…"
@@ -504,6 +498,15 @@ export default function SettingsPage() {
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Validating provider…
         </div>
       )}
+
+      <div className="flex items-center justify-end gap-2 border-t border-edge-soft pt-4">
+        <Button variant="ghost" onClick={resetAll} disabled={!dirty || saving}>
+          <RotateCcw className="h-4 w-4" /> Discard
+        </Button>
+        <Button onClick={handleSave} loading={saving} disabled={!dirty}>
+          <Check className="h-4 w-4" /> Save changes
+        </Button>
+      </div>
     </div>
   );
 }

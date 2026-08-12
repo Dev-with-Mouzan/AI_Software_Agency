@@ -7,6 +7,7 @@ step, in the order given. All progress is persisted so runs survive restarts.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -19,9 +20,13 @@ from agency.agents.base import AgentRunContext, BaseAgent
 from agency.agents.registry import AgentRegistry, get_registry
 from agency.core.enums import MemoryKind, StepStatus, WorkflowStatus
 from agency.db.models import Project, WorkflowRun, WorkflowStep
+from agency.db.session import get_session_factory
 from agency.knowledge.index import KnowledgeBase
+from agency.observability.activity import ActivityReporter, report_activity
 from agency.observability.metrics import WORKFLOW_RUNS
 from agency.permissions.audit import record as audit_record
+
+logger = logging.getLogger(__name__)
 
 PLAN_HINT = (
     "Before you act, read docs/implementation_plan.md in the project (if present) — it "
@@ -85,6 +90,9 @@ class WorkflowError(Exception):
 
 
 class WorkflowEngine:
+    def __init__(self) -> None:
+        self._active_runs: set[str] = set()
+
     # --- lifecycle ------------------------------------------------------
     async def start_command_run(
         self,
@@ -96,6 +104,33 @@ class WorkflowEngine:
         extra: dict[str, Any] | None = None,
         actor: str = "human",
     ) -> WorkflowRun:
+        """Create a command run and execute it synchronously (service/tests)."""
+        run = await self.prepare_command_run(
+            session,
+            project_id=project_id,
+            agents=agents,
+            command=command,
+            extra=extra,
+            actor=actor,
+        )
+        return await self.advance(session, run)
+
+    async def prepare_command_run(
+        self,
+        session: AsyncSession,
+        *,
+        project_id: UUID | None,
+        agents: list[str],
+        command: str,
+        extra: dict[str, Any] | None = None,
+        actor: str = "human",
+    ) -> WorkflowRun:
+        """Validate a command, persist the run and its steps, then return it.
+
+        The run is created in RUNNING state but not advanced — the caller
+        either runs it synchronously (``start_command_run``) or hands it to
+        ``execute_in_background`` so the HTTP request returns immediately.
+        """
         registry = get_registry()
         for kind in agents:
             if registry.get(kind) is None:
@@ -161,7 +196,35 @@ class WorkflowEngine:
         )
         WORKFLOW_RUNS.labels(kind="command", outcome="started").inc()
         await session.commit()
-        return await self.advance(session, run)
+        return run
+
+    async def execute_in_background(self, run_id: UUID) -> None:
+        """Advance a prepared run on its own DB session, outside the request.
+
+        Runs the whole pipeline to completion in the background so the dispatch
+        endpoint returns immediately and the UI can stream live activity.
+        """
+        key = str(run_id)
+        if key in self._active_runs:
+            return
+        self._active_runs.add(key)
+        try:
+            async with get_session_factory()() as session:
+                run = await session.get(WorkflowRun, run_id)
+                if run is None:
+                    logger.warning("background workflow %s not found", run_id)
+                    return
+                if run.status != WorkflowStatus.RUNNING.value:
+                    logger.warning(
+                        "background workflow %s is not RUNNING (status=%s); skipping",
+                        run_id, run.status,
+                    )
+                    return
+                await self.advance(session, run)
+        except Exception:
+            logger.exception("background workflow %s failed", run_id)
+        finally:
+            self._active_runs.discard(key)
 
     async def advance(self, session: AsyncSession, run: WorkflowRun) -> WorkflowRun:
         steps = list(
@@ -179,6 +242,10 @@ class WorkflowEngine:
             if run.status != WorkflowStatus.COMPLETED.value:
                 run.status = WorkflowStatus.COMPLETED.value
                 run.finished_at = datetime.now(UTC)
+                report_activity(
+                    run.id, kind="run", status="completed",
+                    message="Run completed — all steps done.",
+                )
                 WORKFLOW_RUNS.labels(kind=run.kind, outcome="completed").inc()
                 await session.commit()
             return run
@@ -187,6 +254,13 @@ class WorkflowEngine:
         current.status = StepStatus.RUNNING.value
         current.started_at = datetime.now(UTC)
         run.status = WorkflowStatus.RUNNING.value
+        report_activity(
+            run.id, kind="step", status="running",
+            message=f"{current.name} is on shift.",
+            step_id=current.step_id,
+            agent_kind=current.agent_kind or "",
+            agent_name=current.name,
+        )
         await session.flush()
 
         try:
@@ -198,6 +272,14 @@ class WorkflowEngine:
             current.output = {"error": str(exc)}
             run.status = WorkflowStatus.FAILED.value
             run.finished_at = datetime.now(UTC)
+            report_activity(
+                run.id, kind="run", status="failed",
+                message="Run failed.",
+                step_id=current.step_id,
+                agent_kind=current.agent_kind or "",
+                agent_name=current.name,
+                detail=str(exc)[:300],
+            )
             WORKFLOW_RUNS.labels(kind=run.kind, outcome="failed").inc()
             await audit_record(
                 session,
@@ -300,11 +382,29 @@ class WorkflowEngine:
             user_message=command or "Work on the project in the working area.",
             instructions=instructions,
             workflow_run_id=run.id,
+            activity=ActivityReporter(
+                run_id=run.id,
+                step_id=step.step_id,
+                agent_kind=agent_kind,
+                agent_name=agent.name,
+            ),
             extra={"platform": platform} if platform else {},
         )
         result = await agent.run(ctx)
-        if result.reply.startswith("Error during execution"):
+        if result.failed or result.reply.startswith("Error during execution"):
+            ctx.activity.report(  # type: ignore[union-attr]
+                "step",
+                "failed",
+                f"{agent.name} failed this step.",
+                detail=result.reply[:300],
+            )
             raise WorkflowError(f"agent '{agent_kind}' failed: {result.reply[:2000]}")
+        ctx.activity.report(  # type: ignore[union-attr]
+            "step",
+            "completed",
+            f"{agent.name} finished"
+            + (" — awaiting human input." if result.needs_human else " this step."),
+        )
 
         step.output = {
             "reply": result.reply[:8000],

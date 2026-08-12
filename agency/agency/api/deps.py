@@ -5,7 +5,6 @@ from __future__ import annotations
 import secrets
 from typing import Annotated
 
-import httpx
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,21 +27,3 @@ async def require_token(authorization: Annotated[str | None, Header()] = None) -
 
 
 Auth = Depends(require_token)
-
-
-async def get_public_api_url() -> str:
-    settings = get_settings()
-    return f"http://{settings.api_host}:{settings.api_port}/api"
-
-
-class ApiClient:
-    """Thin HTTP client for internal service-to-service calls."""
-
-    def __init__(self, base_url: str | None = None) -> None:
-        self.base_url = base_url or get_settings().api_host
-
-    async def get(self, path: str) -> dict:
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=10) as client:
-            resp = await client.get(path)
-            resp.raise_for_status()
-            return resp.json()

@@ -54,6 +54,13 @@ async function proxyHandler(
     );
   }
 
+  if (res.status === 204 || res.status === 205) {
+    return new NextResponse(null, {
+      status: res.status,
+      headers: SECURITY_HEADERS,
+    });
+  }
+
   const resBody = await res.arrayBuffer();
   return new NextResponse(resBody, {
     status: res.status,

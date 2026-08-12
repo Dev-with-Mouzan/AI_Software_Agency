@@ -26,7 +26,7 @@ export function Tabs({
   return (
     <div>
       <div
-        className="flex items-center gap-1 border-b border-edge-soft"
+        className="flex items-center gap-1 overflow-x-auto border-b border-edge-soft whitespace-nowrap scrollbar-none"
         role="tablist"
       >
         {tabs.map((tab) => {

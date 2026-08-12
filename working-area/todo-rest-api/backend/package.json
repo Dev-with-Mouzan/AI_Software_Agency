@@ -1,0 +1,54 @@
+{
+  "name": "todo-api",
+  "version": "1.0.0",
+  "description": "Production-grade Todo REST API — Fastify 5 + Prisma 6 + PostgreSQL 17",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:unit": "vitest run src/modules/todos/__tests__/todo.service.unit.test.ts",
+    "test:integration": "vitest run src/modules/todos/__tests__/todo.integration.test.ts tests/api.e2e.test.ts",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@fastify/helmet": "^13.0.0",
+    "@fastify/rate-limit": "^10.0.0",
+    "@fastify/swagger": "^9.0.0",
+    "@fastify/swagger-ui": "^5.0.0",
+    "@prisma/client": "^6.0.0",
+    "fastify": "^5.0.0",
+    "pino": "^9.0.0",
+    "prisma": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/supertest": "^6.0.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "prettier": "^3.3.0",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^3.0.0"
+  }
+}

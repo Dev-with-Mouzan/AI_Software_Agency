@@ -4,6 +4,8 @@
 /* ------------------------------------------------------------------ */
 /*  Design tokens — "Signal deck"                                      */
 /*  Deep mission-control surfaces + electric signal-teal accent.       */
+/*  Dark-first, with a curated light theme that keeps the same         */
+/*  hierarchy (surfaces, borders, contrast) instead of a naive invert. */
 /* ------------------------------------------------------------------ */
 
 @theme {
@@ -35,13 +37,22 @@
   --color-info-soft: rgba(99, 179, 255, 0.12);
   --color-info-ink: #041222;
 
-  --color-muted: #8a97ad;
-  --color-faint: #55627a;
-  --color-text: #edf2f7;
-  --color-text-dim: #aab6cc;
+  --color-muted: #9aa6bb;
+  --color-faint: #6e7b93;
+  --color-text: #f2f6fa;
+  --color-text-dim: #b7c2d6;
   --color-ring: #2fe6ce;
   --color-selected: rgba(47, 230, 206, 0.08);
   --color-overlay: rgba(3, 5, 10, 0.6);
+
+  /* Orbit visual — bright-on-dark palette, overridden for light theme */
+  --color-orbit-info: #63b3ff;
+  --color-orbit-accent: #5b8cff;
+  --color-orbit-primary: #2fe6ce;
+  --color-orbit-warning: #f6b84b;
+  --color-primary-glow: rgba(47, 230, 206, 0.8);
+  --color-aurora-a: rgba(47, 230, 206, 0.2);
+  --color-aurora-b: rgba(91, 140, 255, 0.15);
 
   --font-sans:
     "Instrument Sans", "Inter", ui-sans-serif, system-ui, -apple-system,
@@ -62,6 +73,8 @@
     0 12px 40px -8px rgba(0, 0, 0, 0.65), 0 24px 80px -16px rgba(0, 0, 0, 0.75);
   --shadow-glow:
     0 0 0 1px rgba(47, 230, 206, 0.18), 0 10px 44px -8px rgba(47, 230, 206, 0.32);
+  --shadow-cyan-soft:
+    0 8px 32px -12px rgba(47, 230, 206, 0.28);
 }
 
 .light {
@@ -93,13 +106,24 @@
   --color-info-soft: rgba(54, 101, 243, 0.1);
   --color-info-ink: #ffffff;
 
-  --color-muted: #5b6472;
-  --color-faint: #8b94a5;
+  /* Secondary text darkened so labels, details and footnotes stay
+     clearly legible on white surfaces (was #4a556b / #6a7488). */
+  --color-muted: #414c61;
+  --color-faint: #525e73;
   --color-text: #0d1421;
-  --color-text-dim: #38445a;
+  --color-text-dim: #2b3549;
   --color-ring: #0064d2;
   --color-selected: rgba(0, 100, 210, 0.08);
   --color-overlay: rgba(23, 28, 40, 0.45);
+
+  /* Orbit visual — darker, higher-contrast palette for light surfaces */
+  --color-orbit-info: #2a67b8;
+  --color-orbit-accent: #2e4fd8;
+  --color-orbit-primary: #0b9480;
+  --color-orbit-warning: #a8791a;
+  --color-primary-glow: rgba(0, 100, 210, 0.45);
+  --color-aurora-a: rgba(0, 100, 210, 0.07);
+  --color-aurora-b: rgba(229, 50, 61, 0.05);
 
   --shadow-panel:
     0 1px 2px rgba(13, 20, 33, 0.05), 0 10px 30px -12px rgba(13, 20, 33, 0.12);
@@ -114,22 +138,44 @@
     border-color: var(--color-edge);
   }
 
+  html {
+    background-color: var(--color-bg);
+    font-size: 105%;
+    /* Never allow the page itself to scroll sideways — decorative glows and
+       full-bleed marquees must stay inside the viewport. `clip` (not
+       `hidden`) so position:sticky and position:fixed keep working.
+       `hidden` first as the fallback for browsers without `clip`. */
+    overflow-x: hidden;
+    overflow-x: clip;
+    max-width: 100%;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   html,
   body {
-    background: var(--color-bg);
+    min-height: 100%;
+  }
+
+  body {
+    background: transparent;
     color: var(--color-text);
     font-family: var(--font-sans);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
-  }
-
-  html {
-    font-size: 105%;
+    text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
   }
 
   ::selection {
     background: var(--color-primary-soft);
     color: var(--color-text);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 6px;
   }
 
   ::-webkit-scrollbar {
@@ -154,6 +200,106 @@
   button {
     font-family: inherit;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+/* Mobile tuning — unlayered so it beats the `text-sm` utility on inputs.
+   Keep form fields at 16px+ on phones so iOS Safari doesn't auto-zoom the
+   page when an input gains focus. The root base is a fixed 100% on phones
+   (no fluid shrinking) so the whole page stays full-size and readable — the
+   layout becomes responsive, never scaled down. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  html {
+    font-size: 100%;
+  }
+}
+
+/* Mobile (≤768px) landing tuning — full-width premium layout.
+   .site-grid is the fixed full-viewport engineering grid; dial it way down
+   so it reads as a faint texture instead of a busy pattern. */
+@media (max-width: 768px) {
+  .site-grid {
+    opacity: 0.09;
+  }
+
+  /* Sticky mobile navbar — always has a blurred surface so content never
+     bleeds through, at a constant 64px height. */
+  .navbar-mobile {
+    background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    border-bottom: 1px solid var(--color-edge);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Site atmosphere — fixed full-viewport command-center backdrop      */
+/* ------------------------------------------------------------------ */
+
+.site-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      1100px 560px at 16% -10%,
+      color-mix(in srgb, var(--color-primary) 9%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      900px 540px at 94% -6%,
+      color-mix(in srgb, var(--color-accent) 7%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      1400px 760px at 50% 118%,
+      color-mix(in srgb, var(--color-info) 6%, transparent),
+      transparent 66%
+    );
+}
+
+/* Fin engineering grid, faded toward the edges of the viewport */
+.site-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.55;
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--color-edge) 45%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-edge) 45%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 52px 52px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 92% 62% at 50% 0%,
+    black 0%,
+    transparent 72%
+  );
+  mask-image: radial-gradient(
+    ellipse 92% 62% at 50% 0%,
+    black 0%,
+    transparent 72%
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -253,13 +399,6 @@
   50%       { opacity: 0.75; }
 }
 
-/* Conic sweep for orbit ring accent dot */
-@keyframes ring-dot-orbit {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-
-/* Node card pop-in */
 @keyframes node-pop {
   0%   { transform: scale(0.7) translateY(6px); opacity: 0; }
   70%  { transform: scale(1.06) translateY(-1px); opacity: 1; }
@@ -287,12 +426,42 @@
   }
 }
 
+/* Gentle breathing glow — chatbot + live badges */
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+/* Slow scan sweep used on command-center panels */
+@keyframes scan-sweep {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
 @layer utilities {
   .scrollbar-none {
     scrollbar-width: none;
   }
   .scrollbar-none::-webkit-scrollbar {
     display: none;
+  }
+
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
   }
 
   /* Fine engineering grid used in hero surfaces */
@@ -309,6 +478,38 @@
         transparent 1px
       );
     background-size: 26px 26px;
+  }
+
+  /* Grid that fades out toward the edges */
+  .bg-grid-fade {
+    background-image:
+      linear-gradient(
+        to right,
+        color-mix(in srgb, var(--color-primary) 6%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--color-primary) 6%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 42px 42px;
+    -webkit-mask-image: radial-gradient(
+      ellipse 80% 70% at 50% 40%,
+      black 0%,
+      transparent 78%
+    );
+    mask-image: radial-gradient(
+      ellipse 80% 70% at 50% 40%,
+      black 0%,
+      transparent 78%
+    );
+  }
+
+  /* Subtle film grain overlay */
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    opacity: 0.035;
   }
 
   /* Drifting aurora blobs (hero backdrop) */
@@ -338,7 +539,6 @@
   .animate-orbit-spin-reverse {
     animation: orbit-spin-reverse 36s linear infinite;
   }
-  /* Counter-spin utilities so node icons stay upright */
   .animate-counter-spin {
     animation: counter-spin 48s linear infinite;
   }
@@ -356,6 +556,12 @@
   }
   .animate-grid-fade {
     animation: grid-fade 2.4s linear infinite;
+  }
+  .animate-breathe {
+    animation: breathe 3.4s ease-in-out infinite;
+  }
+  .animate-scan {
+    animation: scan-sweep 5s linear infinite;
   }
 
   .animate-shimmer {
@@ -395,6 +601,38 @@
     backdrop-filter: blur(14px) saturate(1.4);
     -webkit-backdrop-filter: blur(14px) saturate(1.4);
   }
+
+  .glass-strong {
+    background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  }
+
+  /* Panel with a soft primary halo along the top edge */
+  .panel-glow {
+    position: relative;
+  }
+  .panel-glow::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-primary) 45%, transparent),
+      transparent 42%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -404,5 +642,6 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

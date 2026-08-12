@@ -1,26 +1,9 @@
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
 
-import { cn } from "@/lib/cn";
-
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-
-export function Skeleton({
-  className,
-}: {
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "animate-shimmer rounded-md bg-surface-3",
-        className,
-      )}
-    />
-  );
-}
-export function Spinner({ className }: { className?: string }) {
+function Spinner({ className }: { className?: string }) {
   return (
     <span
       className={`inline-block h-4 w-4 animate-spin rounded-full border-2 border-edge border-t-primary ${className ?? ""}`}
@@ -41,16 +24,6 @@ export function PageLoader({ label = "Loading" }: { label?: string }) {
       <Spinner className="h-6 w-6" />
       {label}
     </motion.div>
-  );
-}
-
-export function CardLoader({ lines = 4 }: { lines?: number }) {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: lines }).map((_, i) => (
-        <Skeleton key={i} className="h-10 w-full" />
-      ))}
-    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
 
@@ -28,16 +28,41 @@ export function Dialog({
   footer,
   wide,
 }: DialogProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
+    const panel = panelRef.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !panel) return;
+      const focusables = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => !el.hasAttribute("disabled"));
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
+    panel?.focus();
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      previouslyFocused?.focus?.();
     };
   }, [open, onClose]);
 
@@ -60,6 +85,8 @@ export function Dialog({
             aria-hidden
           />
           <motion.div
+            ref={panelRef}
+            tabIndex={-1}
             initial={{ opacity: 0, scale: 0.96, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
@@ -69,7 +96,7 @@ export function Dialog({
               wide ? "max-w-2xl" : "max-w-md",
             )}
           >
-            <div className="flex items-start justify-between border-b border-edge-soft px-5 py-4">
+            <div className="flex items-start justify-between border-b border-edge-soft px-4 py-4 sm:px-5">
               <div>
                 <h2 className="font-display text-base font-semibold tracking-tight text-text">{title}</h2>
                 {description && (
@@ -85,9 +112,9 @@ export function Dialog({
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
+            <div className="max-h-[70dvh] overflow-y-auto px-4 py-4 sm:px-5">{children}</div>
             {footer && (
-              <div className="flex items-center justify-end gap-2 border-t border-edge-soft px-5 py-3.5">
+              <div className="flex items-center justify-end gap-2 border-t border-edge-soft px-4 py-3.5 sm:px-5">
                 {footer}
               </div>
             )}

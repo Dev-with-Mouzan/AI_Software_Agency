@@ -14,8 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { ActivityPanel } from "@/components/workflows/activity-panel";
+import { WorkflowSummaryCollapsible } from "@/components/workflows/workflow-summary";
 import { useApproveWorkflow } from "@/lib/hooks";
-import type { WorkflowRun } from "@/lib/types";
+import type { ReviewResult, WorkflowRun } from "@/lib/types";
 import { formatDate, shortId } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -23,6 +25,7 @@ function stepIcon(status: string) {
   switch ((status ?? "").toUpperCase()) {
     case "COMPLETED":
     case "SUCCESS":
+    case "SUCCEEDED":
       return <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />;
     case "RUNNING":
       return <Loader2 className="h-4 w-4 shrink-0 animate-spin text-info" />;
@@ -37,9 +40,11 @@ function stepIcon(status: string) {
 export function WorkflowRunDialog({
   run,
   onClose,
+  onOpenReview,
 }: {
   run: WorkflowRun | null;
   onClose: () => void;
+  onOpenReview?: (run: WorkflowRun) => void;
 }) {
   const { push } = useToast();
   const approve = useApproveWorkflow();
@@ -59,6 +64,14 @@ export function WorkflowRunDialog({
 
   if (!run) return null;
 
+  const isActive =
+    ["RUNNING", "IN_PROGRESS", "PENDING"].includes(
+      (run.status ?? "").toUpperCase(),
+    );
+
+  const review = run.result?.review as ReviewResult | undefined;
+  const reviewFailed = review?.status === "failed";
+
   return (
     <Dialog open={!!run} onClose={onClose} title={run.kind} wide>
       <div className="space-y-5">
@@ -75,6 +88,48 @@ export function WorkflowRunDialog({
             {run.finished_at ? ` · finished ${formatDate(run.finished_at)}` : ""}
           </span>
         </div>
+
+        {runId && (
+          <ActivityPanel
+            runId={runId}
+            title={isActive ? "Live feed" : "Crew transcript"}
+            compact
+          />
+        )}
+
+        {review && (
+          <div
+            className={cn(
+              "flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2.5",
+              reviewFailed
+                ? "border-danger/30 bg-danger-soft/40"
+                : "border-success/25 bg-success-soft/40",
+            )}
+          >
+            <span
+              className={cn(
+                "text-[11px] font-semibold",
+                reviewFailed ? "text-danger" : "text-success",
+              )}
+            >
+              Code review · {review.status}
+            </span>
+            <span className="font-mono text-[11px] text-text-dim">
+              {review.score}/100 · {review.issues.length} finding
+              {review.issues.length === 1 ? "" : "s"}
+            </span>
+            <Button
+              size="sm"
+              variant={reviewFailed ? "danger" : "secondary"}
+              className="ml-auto"
+              onClick={() => onOpenReview?.(run)}
+            >
+              View report
+            </Button>
+          </div>
+        )}
+
+        {run.result?.summary ? <WorkflowSummaryCollapsible run={run} /> : null}
 
         {run.context && Object.keys(run.context).length > 0 && (
           <div className="rounded-md border border-edge-soft bg-surface-2 px-3 py-2.5">

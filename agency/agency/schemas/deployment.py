@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from agency.schemas.common import ORMModel
+from agency.schemas.workflow import WorkflowRunOut
 
 
 class DeploymentRunRequest(BaseModel):
@@ -57,3 +59,69 @@ class DeploymentOut(ORMModel):
     error: str
     created_at: datetime
     updated_at: datetime
+
+    # Provider-based fields (AWS / Vercel).
+    provider: str = ""
+    deployment_url: str = ""
+    project_url: str = ""
+    deployment_id: str = ""
+    custom_domain: str = ""
+    domain_status: str = "none"
+    dns_records: dict = Field(default_factory=dict)
+    deployed_commit: str = ""
+    run_id: str = ""
+    logs: list = Field(default_factory=list)
+    removed: bool = False
+
+
+class DeploymentProviderOption(BaseModel):
+    name: str
+    label: str
+    configured: bool
+    missing: list[str] = Field(default_factory=list)
+    compatible: bool
+    reason: str
+    project_type: str = ""
+    technology_stack: dict[str, Any] = Field(default_factory=dict)
+
+
+class DeploymentOptionsOut(BaseModel):
+    project_type: str = ""
+    technology_stack: dict[str, Any] = Field(default_factory=dict)
+    providers: list[DeploymentProviderOption] = Field(default_factory=list)
+
+
+class DeployRequest(BaseModel):
+    provider: str = Field(min_length=1, max_length=40)
+    environment: str = Field(default="production", max_length=30)
+
+
+class DeployLaunchOut(BaseModel):
+    deployment: DeploymentOut
+    run: WorkflowRunOut
+
+
+class DeploymentLogItem(BaseModel):
+    ts: str = ""
+    level: str = "info"
+    message: str = ""
+    detail: str = ""
+
+
+class DeploymentLogOut(BaseModel):
+    deployment_id: str | None = None
+    status: str = ""
+    logs: list[DeploymentLogItem] = Field(default_factory=list)
+
+
+class DomainRequest(BaseModel):
+    domain: str = Field(min_length=3, max_length=300)
+
+
+class DomainOut(BaseModel):
+    domain: str
+    status: str
+    dns_records: dict = Field(default_factory=dict)
+    message: str = ""
+    verified: bool = False
+    ssl: str = "pending"

@@ -1,0 +1,57 @@
+# CI/CD for Daily Ledger (static frontend)
+#
+# IMPORTANT: GitHub Actions only picks up workflows from the repo root.
+# Copy this file to `.github/workflows/deploy.yml` at the repository root
+# (the copy in deployment/ is the source of truth / template).
+#
+# What it does:
+#   1. Validates JS syntax with `node --check`.
+#   2. Deploys the static site to GitHub Pages (free static hosting).
+#
+# No secrets are required — GitHub Pages deployment uses the built-in
+# `GITHUB_TOKEN` with the permissions below.
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate static assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check app.js
+        run: node --check frontend/js/app.js
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload static site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # The whole static frontend is the site root
+          path: frontend/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

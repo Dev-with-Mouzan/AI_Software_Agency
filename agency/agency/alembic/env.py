@@ -3,7 +3,6 @@ runtime async URL (asyncpg -> psycopg, aiosqlite -> sqlite3)."""
 
 from __future__ import annotations
 
-import re
 import sys
 from logging.config import fileConfig
 from pathlib import Path
@@ -32,10 +31,6 @@ def _sync_url(url: str) -> str:
     if url.startswith("postgresql+asyncpg"):
         return url.replace("postgresql+asyncpg", "postgresql+psycopg")
     return url
-
-
-def _mask_password(url: str) -> str:
-    return re.sub(r"://([^:]+):([^@]+)@", r"://\1:****@", url)
 
 
 def run_migrations_offline() -> None:

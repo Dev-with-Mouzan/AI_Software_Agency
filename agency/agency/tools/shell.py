@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import subprocess
 import sys
 from typing import Any
 
@@ -41,31 +42,38 @@ class RunCommandTool(Tool):
         if not cwd.exists():
             return ToolResult(False, error=f"workspace does not exist: {cwd}")
 
+        # Run the subprocess in a worker thread so command execution does not
+        # depend on the event-loop transport (which raises NotImplementedError
+        # on Windows when the loop is not a proactor loop).
         try:
-            proc = await asyncio.create_subprocess_shell(
+            completed = await asyncio.to_thread(
+                subprocess.run,
                 command,
                 cwd=str(cwd),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=timeout,
             )
-            try:
-                raw, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-            except TimeoutError:
-                proc.kill()
-                return ToolResult(False, error=f"command timed out after {timeout}s")
+        except subprocess.TimeoutExpired:
+            return ToolResult(False, error=f"command timed out after {timeout}s")
         except Exception as exc:
-            return ToolResult(False, error=f"failed to run command: {exc}")
+            detail = str(exc).strip() or f"{type(exc).__name__} spawning the command"
+            return ToolResult(False, error=f"failed to run command: {detail}")
 
-        output = raw.decode("utf-8", errors="replace") if raw else ""
+        output = completed.stdout.decode("utf-8", errors="replace") if completed.stdout else ""
         output = redact(output)
         if len(output) > MAX_OUTPUT:
             output = output[:MAX_OUTPUT] + "\n...[output truncated]"
-        code = proc.returncode or 0
-        return ToolResult(
-            code == 0,
-            output=output,
-            data={"exit_code": code, "command": command, "shell": sys.platform},
-        )
+        code = completed.returncode or 0
+        data = {"exit_code": code, "command": command, "shell": sys.platform}
+        if code == 0:
+            return ToolResult(True, output=output, data=data)
+        tail = "\n".join(output.splitlines()[-8:]) if output.strip() else ""
+        error = f"command exited with code {code}"
+        if tail:
+            error += f": {tail[:2000]}"
+        return ToolResult(False, output=output, error=error, data=data)
 
 
 def redact(text: str) -> str:

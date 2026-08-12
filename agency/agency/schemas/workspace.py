@@ -39,3 +39,21 @@ class WorkspaceTreeOut(BaseModel):
     project_id: UUID | None = None
     entries: list[FolderEntry] = Field(default_factory=list)
     file_count: int = 0
+
+
+class DirListingOut(BaseModel):
+    slug: str
+    path: str = ""
+    entries: list[FolderEntry] = Field(default_factory=list)
+    file_count: int = 0
+
+
+class FileContentOut(BaseModel):
+    path: str
+    name: str
+    size: int
+    content: str = ""
+    truncated: bool = False
+    binary: bool = False
+    redacted: bool = False
+    reason: str = ""

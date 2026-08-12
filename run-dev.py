@@ -82,7 +82,7 @@ def main() -> int:
         return 1
 
     print("=" * 64)
-    print("  AI Software Agency - full stack dev")
+    print("  DevPilot AI - full stack dev")
     print(f"  API : http://localhost:{API_PORT}   (docs at /api/docs)")
     print(f"  Web : http://localhost:{WEB_PORT}")
     print("  Stop: Ctrl+C")

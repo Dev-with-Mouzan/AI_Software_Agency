@@ -1,0 +1,24 @@
+# Keep the EC2 build context lean — the Dockerfile only copies agency/ paths,
+# but Docker still transfers the whole context to the daemon first.
+node_modules
+.next
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.git
+.env
+.env.*
+logs
+dist
+build
+working-area
+frontend
+deployment
+agency_dev.db
+agency_dev.db-shm
+agency_dev.db-wal
+agency/.env

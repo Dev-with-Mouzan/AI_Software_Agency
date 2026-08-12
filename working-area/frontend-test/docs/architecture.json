@@ -1,0 +1,45 @@
+{
+  "project_type": "",
+  "technology_stack": {},
+  "architecture": {
+    "pattern": "state-driven single-page app",
+    "state": "single source of truth: JS array of {id, text, completed}; DOM re-rendered from state",
+    "events": "event delegation on the list element using data-action / data-id attributes",
+    "persistence": "localStorage write after every mutation; load with try/catch and shape validation on init",
+    "security": "user text inserted via textContent to prevent XSS",
+    "ids": "crypto.randomUUID() with Date.now() fallback",
+    "directories": {
+      "backend": null,
+      "frontend": "frontend/",
+      "infra": null,
+      "docs": "docs/",
+      "tests": null,
+      "shared": null
+    }
+  },
+  "project_structure": {
+    "tree": {
+      "docs": [
+        "architecture.json",
+        "implementation_plan.md"
+      ],
+      "frontend": {
+        "index.html": "semantic markup: form, filter bar, list, footer",
+        "css/style.css": "layout, components, completed state, responsive",
+        "js/app.js": "state, localStorage persistence, rendering, events"
+      }
+    }
+  },
+  "plan": {
+    "tasks": [
+      "Create frontend/index.html with semantic markup (form, filter bar, list, footer)",
+      "Create frontend/css/style.css (layout, components, completed state, responsive)",
+      "Create frontend/js/app.js (state, loadTodos/saveTodos, add/toggle/edit/delete/clearCompleted/setFilter, render, event listeners)",
+      "Wire inline editing with blur/Enter save and Escape cancel",
+      "Run node --check frontend/js/app.js and manual QA checklist",
+      "Update README and record decisions in memory"
+    ],
+    "dependencies": []
+  },
+  "api_contract": {}
+}

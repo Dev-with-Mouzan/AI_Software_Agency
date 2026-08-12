@@ -1,5 +1,5 @@
 # =============================================================================
-# AI Software Agency - Makefile (dev workflow)
+# DevPilot AI - Makefile (dev workflow)
 # Usage: `make setup`, `make dev-api`, `make test`, ...
 # On Windows: use `make` from Git Bash / WSL, or run the equivalent commands
 # from the `scripts/` directory manually.

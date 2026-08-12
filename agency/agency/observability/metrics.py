@@ -1,17 +1,13 @@
-"""Prometheus metrics and (optional) OpenTelemetry tracing."""
+"""Prometheus metrics."""
 
 from __future__ import annotations
 
 import time
-from contextlib import asynccontextmanager
-from typing import Any
 
 from prometheus_client import Counter, Gauge, Histogram
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
-
-from agency.config import get_settings
 
 AGENT_RUNS = Counter("agency_agent_runs_total", "Agent runs", ["agent_kind", "outcome"])
 AGENT_TOOL_CALLS = Counter(
@@ -26,7 +22,6 @@ TASK_DURATION = Histogram(
 WORKFLOW_RUNS = Counter("agency_workflow_runs_total", "Workflow runs", ["kind", "outcome"])
 LLM_CALLS = Counter("agency_llm_calls_total", "LLM calls", ["provider", "model"])
 LLM_LATENCY = Histogram("agency_llm_latency_seconds", "LLM call latency", ["provider"])
-AGENTS_ACTIVE = Gauge("agency_agents_active", "Agents currently running")
 AGENT_STATUS = Gauge("agency_agent_status", "Agent status (1=running)", ["agent_kind"])
 
 
@@ -46,22 +41,3 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
             return response
         finally:
             self.REQUEST_TIME.labels(method=method, path=path).observe(time.perf_counter() - start)
-
-
-@asynccontextmanager
-async def otel_trace(span_name: str, attributes: dict[str, Any] | None = None):
-    """No-op tracer when OpenTelemetry is not configured."""
-    _ = span_name, attributes
-    try:
-        from opentelemetry import trace  # type: ignore
-
-        if get_settings().otel_exporter_otlp_endpoint and trace.get_tracer_provider():
-            tracer = trace.get_tracer("agency")
-            with tracer.start_as_current_span(span_name) as span:
-                if attributes:
-                    span.set_attributes(attributes)
-                yield span
-                return
-    except Exception:
-        pass
-    yield None

@@ -64,7 +64,7 @@ export function CreateProjectDialog({
       open={open}
       onClose={onClose}
       title="New project"
-      description="A project is the workspace the agency builds software in."
+      description="A project is the workspace DevPilot builds software in."
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -105,7 +105,7 @@ export function CreateProjectDialog({
             id="project-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="What should the agency build?"
+            placeholder="What should DevPilot build?"
             rows={4}
           />
         </Field>

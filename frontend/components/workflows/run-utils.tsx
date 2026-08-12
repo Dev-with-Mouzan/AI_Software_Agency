@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   CheckCircle2,
   Circle,
   Clock,
@@ -11,7 +12,7 @@ import {
 import { formatDuration } from "@/lib/format";
 import type { WorkflowRun, WorkflowStep } from "@/lib/types";
 
-export type RunTone = "primary" | "success" | "warning" | "danger" | "info";
+type RunTone = "primary" | "success" | "warning" | "danger" | "info";
 
 export interface RunStatusMeta {
   tone: RunTone;
@@ -25,6 +26,7 @@ const RUN_STATUS: Record<string, RunStatusMeta> = {
   FAILED: { tone: "danger", Icon: XCircle },
   ERROR: { tone: "danger", Icon: XCircle },
   REJECTED: { tone: "danger", Icon: XCircle },
+  REVIEW_FAILED: { tone: "danger", Icon: AlertTriangle },
   RUNNING: { tone: "info", Icon: Loader2 },
   IN_PROGRESS: { tone: "info", Icon: Loader2 },
   WAITING: { tone: "warning", Icon: Hourglass },
@@ -36,7 +38,7 @@ export function runStatusMeta(status: string | null | undefined): RunStatusMeta 
   return RUN_STATUS[(status ?? "").toUpperCase()] ?? { tone: "primary", Icon: Circle };
 }
 
-export const STEP_DONE = ["COMPLETED", "SUCCESS", "SUCCEEDED"] as const;
+const STEP_DONE = ["COMPLETED", "SUCCESS", "SUCCEEDED"] as const;
 
 export function isStepDone(status: string | null | undefined): boolean {
   return STEP_DONE.includes((status ?? "").toUpperCase() as (typeof STEP_DONE)[number]);

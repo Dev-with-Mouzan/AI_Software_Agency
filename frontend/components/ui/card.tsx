@@ -46,7 +46,7 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-3 border-b border-edge-soft px-5 py-3.5",
+        "flex items-center justify-between gap-3 border-b border-edge-soft px-4 py-3 sm:px-5 sm:py-3.5",
         className,
       )}
     >
@@ -74,18 +74,6 @@ export function CardTitle({
   );
 }
 
-export function CardDescription({
-  className,
-  children,
-}: {
-  className?: string;
-  children?: ReactNode;
-}) {
-  return (
-    <p className={cn("text-xs text-muted", className)}>{children}</p>
-  );
-}
-
 export function CardBody({
   className,
   children,
@@ -93,24 +81,5 @@ export function CardBody({
   className?: string;
   children?: ReactNode;
 }) {
-  return <div className={cn("px-5 py-4", className)}>{children}</div>;
-}
-
-export function CardFooter({
-  className,
-  children,
-}: {
-  className?: string;
-  children?: ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "border-t border-edge-soft bg-surface-2/60 px-5 py-3",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
+  return <div className={cn("px-4 py-4 sm:px-5", className)}>{children}</div>;
 }

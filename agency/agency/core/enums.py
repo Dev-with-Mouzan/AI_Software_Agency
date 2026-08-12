@@ -17,20 +17,14 @@ class TaskStatus(str, enum.Enum):
 
 
 class Priority(str, enum.Enum):
-    CRITICAL = "CRITICAL"
-    HIGH = "HIGH"
     MEDIUM = "MEDIUM"
-    LOW = "LOW"
 
 
 class ReviewStatus(str, enum.Enum):
     """Code review pipeline states."""
 
     PENDING = "PENDING"
-    IN_REVIEW = "IN_REVIEW"
     APPROVED = "APPROVED"
-    CHANGES_REQUESTED = "CHANGES_REQUESTED"
-    QA_APPROVED = "QA_APPROVED"
     REJECTED = "REJECTED"
 
 
@@ -41,16 +35,7 @@ class AgentStatus(str, enum.Enum):
     RUNNING = "RUNNING"
     WAITING_HUMAN = "WAITING_HUMAN"
     BLOCKED = "BLOCKED"
-    OFFLINE = "OFFLINE"
     ERROR = "ERROR"
-
-
-class AgentKind(str, enum.Enum):
-    PLANNER = "planner"
-    BACKEND_ENGINEER = "backend_engineer"
-    FRONTEND_ENGINEER = "frontend_engineer"
-    DEVOPS_ENGINEER = "devops_engineer"
-    CODE_REVIEWER = "code_reviewer"
 
 
 class WorkflowStatus(str, enum.Enum):
@@ -61,6 +46,7 @@ class WorkflowStatus(str, enum.Enum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+    REVIEW_FAILED = "REVIEW_FAILED"
 
 
 class StepStatus(str, enum.Enum):
@@ -69,7 +55,6 @@ class StepStatus(str, enum.Enum):
     WAITING_HUMAN = "WAITING_HUMAN"
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
-    SKIPPED = "SKIPPED"
 
 
 class DeploymentStatus(str, enum.Enum):
@@ -81,6 +66,7 @@ class DeploymentStatus(str, enum.Enum):
     DEPLOYED = "DEPLOYED"
     FAILED = "FAILED"
     REJECTED = "REJECTED"
+    REMOVED = "REMOVED"
 
 
 class MemoryKind(str, enum.Enum):
@@ -91,28 +77,11 @@ class MemoryKind(str, enum.Enum):
     PROJECT = "PROJECT"
     DECISION = "DECISION"
     ARCHITECTURE = "ARCHITECTURE"
-    PREFERENCE = "PREFERENCE"
     LESSON = "LESSON"
 
 
-class MessageRole(str, enum.Enum):
-    HUMAN = "human"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
-    TOOL = "tool"
-
-
 class AuditAction(str, enum.Enum):
-    CREATE = "create"
-    UPDATE = "update"
     READ = "read"
-    DELETE = "delete"
-    RUN_TOOL = "run_tool"
-    APPROVE = "approve"
-    REJECT = "reject"
-    ASSIGN = "assign"
-    TRANSITION = "transition"
-    PERMISSION_DENIED = "permission_denied"
 
 
 # Mapping of agent kind -> allowed workspace directory (relative to project root).

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from sqlalchemy import select
@@ -18,12 +19,14 @@ from agency.llm.provider import BaseLLMProvider, NullProvider
 from agency.memory.manager import MemoryManager
 from agency.tools.registry import get_tool_registry
 
+logger = logging.getLogger(__name__)
+
 
 def _safe_provider(builder: Any) -> tuple[BaseLLMProvider, str]:
     """Build a provider; never raise — fall back to NullProvider and record why."""
     try:
         return builder(), ""
-    except Exception as exc:  # noqa: BLE001 - registry must survive misconfig
+    except Exception as exc:
         return NullProvider(), str(exc)
 
 
@@ -39,7 +42,7 @@ class AgentRegistry:
         self.memory = memory or MemoryManager()
         self.knowledge = knowledge or KnowledgeBase()
         tools = get_tool_registry()
-        self.llm, self.default_error = _safe_provider(lambda: llm or get_provider())
+        self.llm = _safe_provider(lambda: llm or get_provider())[0]
         # Each agent can use its own LLM (e.g. DeepSeek for the three
         # implementation agents, default provider for the rest).
         self.agents: dict[str, BaseAgent] = {}
@@ -50,13 +53,11 @@ class AgentRegistry:
             )
             if error:
                 self.config_errors[kind] = error
+                logger.warning("agent '%s' has no usable LLM: %s", kind, error)
             self.agents[kind] = cls(provider, self.memory, self.knowledge, tools)
 
     def get(self, kind: str) -> BaseAgent | None:
         return self.agents.get(kind)
-
-    def all_agents(self) -> list[BaseAgent]:
-        return list(self.agents.values())
 
     async def seed(self, session: AsyncSession) -> None:
         """Insert AgentRecord rows for every registered agent (idempotent).
@@ -138,6 +139,21 @@ class AgentRegistry:
         agent = self.get(agent_kind)
         if agent is None:
             raise ValueError(f"unknown agent kind: {agent_kind}")
+        error = self.config_errors.get(agent_kind)
+        if error:
+            # Never silently degrade to the offline provider: a misconfigured
+            # LLM must fail the run loudly so the human knows nothing was built.
+            logger.warning("agent '%s' cannot run: %s", agent_kind, error)
+            result = AgentResult()
+            result.reply = (
+                f"{agent.name} cannot run because the LLM provider is not configured: "
+                f"{error}. Open Settings to connect an API key, or set it in the "
+                ".env file, then restart the API."
+            )
+            result.needs_human = True
+            result.failed = True
+            result.stats = {"agent": agent_kind, "error": error}
+            return result
         return await agent.run(ctx)
 
 

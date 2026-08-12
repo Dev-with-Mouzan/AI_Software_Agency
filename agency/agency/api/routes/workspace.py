@@ -1,11 +1,14 @@
-"""Working area endpoints: list folders, create, adopt, inspect."""
+"""Working area endpoints: list folders, create, adopt, inspect, browse files."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse, StreamingResponse
 
 from agency.api.deps import DbSession
 from agency.schemas.workspace import (
+    DirListingOut,
+    FileContentOut,
     WorkspaceAdopt,
     WorkspaceCreate,
     WorkspaceFolderOut,
@@ -67,3 +70,55 @@ async def folder_tree(slug: str, session: DbSession) -> WorkspaceTreeOut:
     except WorkspaceError as exc:
         raise HTTPException(404, str(exc)) from exc
     return WorkspaceTreeOut(**tree)
+
+
+@router.get("/folders/{slug}/dir", response_model=DirListingOut)
+async def folder_dir(
+    slug: str,
+    session: DbSession,
+    path: str = Query("", description="project-relative directory path"),
+) -> DirListingOut:
+    try:
+        listing = await workspace_service.list_dir(session, slug, path)
+    except WorkspaceError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return DirListingOut(**listing)
+
+
+@router.get("/folders/{slug}/file", response_model=FileContentOut)
+async def read_project_file(
+    slug: str,
+    session: DbSession,
+    path: str = Query(..., description="project-relative file path"),
+) -> FileContentOut:
+    try:
+        content = await workspace_service.read_file(session, slug, path)
+    except WorkspaceError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return FileContentOut(**content)
+
+
+@router.get("/folders/{slug}/download")
+async def download_file(
+    slug: str,
+    session: DbSession,
+    path: str = Query(..., description="project-relative file path"),
+) -> FileResponse:
+    try:
+        file = await workspace_service.resolve_file(session, slug, path)
+    except WorkspaceError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return FileResponse(file, filename=file.name)
+
+
+@router.get("/folders/{slug}/archive")
+async def download_archive(slug: str, session: DbSession) -> StreamingResponse:
+    try:
+        filename, buffer = await workspace_service.project_archive(session, slug)
+    except WorkspaceError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

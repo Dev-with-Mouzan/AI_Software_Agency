@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException
 
 from agency.agents.registry import get_registry
@@ -10,32 +12,47 @@ from agency.api.routes.workflows import serialize_workflow_run
 from agency.schemas.agent import AgentOut, AgentRunRequest, AgentRuntimeOut
 from agency.schemas.workflow import WorkflowRunOut
 from agency.services.projects import project_service
-from agency.workflows.engine import WorkflowError, workflow_engine
+from agency.workflows.engine import WorkflowError
+from agency.workflows.orchestrator import OrchestrationError, workflow_orchestrator
 
 router = APIRouter(prefix="/agents", tags=["agents"])
+
+# Keep a reference to fire-and-forget run tasks so they are not garbage
+# collected; tasks are removed from the set when they finish.
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _spawn_background(coro) -> None:
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 @router.post("/run", response_model=WorkflowRunOut, status_code=201)
 async def run_agents(payload: AgentRunRequest, session: DbSession) -> WorkflowRunOut:
-    """Run an ordered list of agents against a project (sequential)."""
+    """Dispatch a set of agents; the orchestrator controls the whole workflow.
+
+    The run is created and returned immediately in RUNNING state; the
+    orchestrated pipeline (planning, implementation, review loop, deployment)
+    executes in the background so the UI can stream live activity.
+    """
     if payload.project_id:
         project = await project_service.get(session, payload.project_id)
         if project is None:
             raise HTTPException(404, "project not found")
     try:
-        run = await workflow_engine.start_command_run(
+        run = await workflow_orchestrator.prepare(
             session,
             project_id=payload.project_id,
             agents=payload.agents,
             command=payload.command,
-            extra={
-                "platform": payload.platform,
-                "plan_source": payload.plan_source,
-            },
+            platform=payload.platform,
+            plan_source=payload.plan_source,
             actor="human",
         )
-    except WorkflowError as exc:
+    except (OrchestrationError, WorkflowError) as exc:
         raise HTTPException(422, str(exc)) from exc
+    _spawn_background(workflow_orchestrator.execute_in_background(run.id))
     return await serialize_workflow_run(session, run)
 
 

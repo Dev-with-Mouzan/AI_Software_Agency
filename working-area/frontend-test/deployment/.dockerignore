@@ -1,0 +1,10 @@
+# Keep the Docker build context minimal — only static assets are needed.
+.git
+.github
+docs
+deployment
+backend
+*.md
+.env
+.env.*
+node_modules

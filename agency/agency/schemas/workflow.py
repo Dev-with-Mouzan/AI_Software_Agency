@@ -10,11 +10,6 @@ from pydantic import BaseModel, Field
 from agency.schemas.common import ORMModel
 
 
-class WorkflowStartRequest(BaseModel):
-    kind: str = Field(min_length=1, max_length=60)  # build_project | code_review | deploy
-    context: dict = Field(default_factory=dict)
-
-
 class WorkflowStepOut(ORMModel):
     id: UUID
     workflow_run_id: UUID
@@ -40,6 +35,30 @@ class WorkflowRunOut(ORMModel):
     started_at: datetime | None
     finished_at: datetime | None
     steps: list[WorkflowStepOut] = Field(default_factory=list)
+
+
+class WorkflowActivityOut(ORMModel):
+    seq: int
+    run_id: str
+    step_id: str
+    agent_kind: str
+    agent_name: str
+    kind: str
+    status: str
+    message: str
+    tool: str = ""
+    detail: str = ""
+    metadata: dict = Field(default_factory=dict)
+    ts: str
+
+
+class WorkflowActivityPage(ORMModel):
+    run_id: str
+    status: str
+    done: bool
+    activities: list[WorkflowActivityOut] = Field(default_factory=list)
+
+
 
 
 class WorkflowApproveRequest(BaseModel):

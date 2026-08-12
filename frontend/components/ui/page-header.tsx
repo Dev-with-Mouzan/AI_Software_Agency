@@ -53,7 +53,7 @@ export function PageHeader({
           initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.38, ease: EASE, delay: 0.08 }}
-          className="mt-3 font-display text-3xl font-bold tracking-tight text-text sm:text-4xl"
+          className="mt-3 font-display text-2xl font-bold tracking-tight text-text sm:text-4xl"
         >
           {title}
         </motion.h1>

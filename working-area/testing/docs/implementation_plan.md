@@ -1,0 +1,1 @@
+write a program in python to print table of the number inputed by user

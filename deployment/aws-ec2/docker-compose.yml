@@ -1,0 +1,65 @@
+# Docker Compose for the AI Agency on a single AWS EC2 VM.
+# FastAPI app + PostgreSQL with persistent volumes for the DB, working area
+# and knowledge base. Copy .env.example -> .env and fill in secrets.
+#
+#   docker compose up -d --build
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: agency
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: agency
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agency -d agency"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../..
+      dockerfile: deployment/aws-ec2/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql+asyncpg://agency:${POSTGRES_PASSWORD}@db:5432/agency
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      # Comma-separated origins that may call the API directly. The Vercel
+      # frontend talks to it through a server-side proxy, but set your domain
+      # here anyway so the browser can hit it directly if needed.
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-}
+      # Shared secret the frontend proxy forwards as a Bearer token.
+      API_TOKEN: ${API_TOKEN:?set API_TOKEN in .env}
+      WORKING_AREA: /app/working-area
+      # LLM provider keys + agent routing (same block as the local .env).
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-}
+      DEEPSEEK_AGENTS: ${DEEPSEEK_AGENTS:-}
+      QWEN_API_KEY: ${QWEN_API_KEY:-}
+      QWEN_BASE_URL: ${QWEN_BASE_URL:-}
+      QWEN_MODEL: ${QWEN_MODEL:-}
+      AGENT_MODELS: ${AGENT_MODELS:-}
+    volumes:
+      - working-area:/app/working-area
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/api/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  working-area:

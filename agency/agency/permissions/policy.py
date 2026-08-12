@@ -22,7 +22,7 @@ from agency.core.enums import WORKSPACE_MAP
 ACCESS_POLICY: dict[str, dict[str, list[str]]] = {
     "planner": {"read": ["*"], "write": ["docs"]},
     "backend_engineer": {"read": ["*"], "write": ["backend"]},
-    "frontend_engineer": {"read": ["*"], "write": ["frontend"]},
+    "frontend_engineer": {"read": ["*"], "write": ["frontend", "docs"]},
     "devops_engineer": {"read": ["*"], "write": ["deployment"]},
     "code_reviewer": {"read": ["*"], "write": ["docs"]},
 }
@@ -94,9 +94,30 @@ FORBIDDEN_COMMAND_SUBSTRINGS = (
 )
 
 # Shell metacharacters that enable chaining or injection. Agents should only run
-# a single command (program + arguments); anything that joins or substitutes
-# commands is rejected outright.
-CHAINING_CHARACTERS = ("&&", "||", ";", "|", "`", "$(", "${", ">", "<")
+# a single command (program + arguments); anything that joins, substitutes,
+# groups or obfuscates is rejected outright. Quotes and backslashes are also
+# rejected so a program name cannot be smuggled past the allowlist by breaking
+# it apart (e.g. c"ur"l or cu\\rl).
+CHAINING_CHARACTERS = (
+    "&&", "||", ";", "|", "&", "`", "$(", "${", "(", ")", "{", "}",
+    ">", "<", '"', "'", "\\",
+)
+
+# ASCII control characters can smuggle a second command into a supposedly
+# single one (\n, \r) or obfuscate it with non-space whitespace (\t). Checked
+# on the raw command before any stripping.
+CONTROL_CHARS = {chr(i) for i in range(32)} | {"\x7f"}
+
+# Programs agents may invoke as the first token. Anything else is rejected, so
+# blacklist-bypass tricks cannot land curl/wget/nc on the command line. Extend
+# deliberately; models reach shell for tests/lints/builds, not arbitrary tools.
+ALLOWED_COMMAND_PROGRAMS = {
+    "echo", "exit", "true", "false", "cd", "pwd", "ls", "cat", "grep", "find",
+    "wc", "head", "tail", "sort", "uniq", "diff", "cp", "mv", "mkdir", "rm",
+    "touch", "git", "npm", "npx", "pnpm", "yarn", "node", "python", "python3",
+    "pip", "uv", "pytest", "docker", "docker-compose", "make", "tsc", "eslint",
+    "ruff", "black", "prettier",
+}
 
 # Files never readable or writable by any agent (secrets and credentials).
 # Blocked by both the path check and the shell tool so a command like
@@ -125,24 +146,23 @@ class PermissionDecision:
     reason: str = ""
 
 
-class PermissionError(Exception):
-    """Raised when an agent attempts an action outside its boundaries."""
-
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.message = message
-
-
 class PermissionPolicy:
-    """Stateless resolver of path + tool permissions."""
+    """Stateless resolver of path + tool permissions.
+
+    ``write_dirs`` overrides the static ACCESS_POLICY write list for an agent
+    (used by the orchestrator once the Planner has designed an architecture, so
+    agents write into e.g. ``apps/api`` instead of a hardcoded ``backend/``).
+    """
 
     def __init__(
         self,
         project_root: Path | str | None = None,
         workspace_mode: str = "structured",
+        write_dirs: list[str] | None = None,
     ) -> None:
         self.project_root = Path(project_root) if project_root else None
         self.workspace_mode = workspace_mode
+        self.write_dirs = list(write_dirs) if write_dirs else None
 
     # --- path checks -----------------------------------------------------
     def check_path(self, agent_kind: str, path: str, mode: str = "read") -> PermissionDecision:
@@ -180,7 +200,11 @@ class PermissionPolicy:
                 if Path(resolved).name.lower() in PROTECTED_FILES:
                     return PermissionDecision(False, f"protected file: {resolved.name}")
                 return PermissionDecision(True)
-            write_dirs = ACCESS_POLICY[agent_kind]["write"]
+            write_dirs = (
+                self.write_dirs
+                if self.write_dirs is not None
+                else ACCESS_POLICY[agent_kind]["write"]
+            )
             if not write_dirs or (first not in write_dirs and "*" not in write_dirs):
                 return PermissionDecision(
                     False, f"{agent_kind} may only write inside: {write_dirs}"
@@ -209,9 +233,14 @@ class PermissionPolicy:
         return PermissionDecision(False, f"tool '{tool_name}' is not allowed for {agent_kind}")
 
     def check_command(self, agent_kind: str, command: str) -> PermissionDecision:
+        if any(ch in CONTROL_CHARS for ch in command):
+            return PermissionDecision(False, "command rejected by policy: control characters")
         lowered = command.strip().lower()
         if not lowered:
             return PermissionDecision(False, "empty command")
+        program = lowered.split()[0]
+        if program not in ALLOWED_COMMAND_PROGRAMS:
+            return PermissionDecision(False, f"program '{program}' is not allowed")
         for bad in FORBIDDEN_COMMAND_PREFIXES:
             if lowered.startswith(bad):
                 return PermissionDecision(False, f"command rejected by policy: {bad}")

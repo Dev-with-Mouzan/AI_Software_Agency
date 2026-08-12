@@ -1,0 +1,34 @@
+// Prisma schema — Todo REST API
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Todo {
+  id          String    @id @default(uuid())
+  title       String // 1..200 (validated at the API layer)
+  description String? // max 1000
+  completed   Boolean   @default(false)
+  priority    Priority  @default(MEDIUM)
+  dueAt       DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Cursor pagination sorts by (createdAt, id); these indexes serve list filters + sort.
+  @@index([completed, createdAt])
+  @@index([priority, createdAt])
+
+  @@map("todos")
+}

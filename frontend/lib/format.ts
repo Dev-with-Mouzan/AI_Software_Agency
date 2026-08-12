@@ -1,7 +1,19 @@
+function parseDate(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  // The backend stores timestamps in UTC, but on SQLite the offset is lost on
+  // read-back, so strings arrive as "2026-08-12T09:00:00" with no timezone.
+  // JS would parse that as *local* time (making a just-created project show
+  // as "5h ago" in UTC+5). Treat offset-less timestamps as UTC.
+  const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso);
+  const normalized = !hasOffset && iso.includes("T") ? `${iso}Z` : iso;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function timeAgo(iso: string | null | undefined): string {
   if (!iso) return "never";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "unknown";
+  const date = parseDate(iso);
+  if (!date) return "unknown";
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
   if (seconds < 10) return "just now";
   if (seconds < 60) return `${seconds}s ago`;
@@ -16,8 +28,8 @@ export function timeAgo(iso: string | null | undefined): string {
 
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
+  const date = parseDate(iso);
+  if (!date) return "—";
   return date.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
@@ -31,9 +43,9 @@ export function formatDuration(
   end: string | null | undefined,
 ): string {
   if (!start) return "—";
-  const from = new Date(start).getTime();
+  const from = parseDate(start)?.getTime() ?? NaN;
   if (Number.isNaN(from)) return "—";
-  const to = end ? new Date(end).getTime() : Date.now();
+  const to = end ? (parseDate(end)?.getTime() ?? NaN) : Date.now();
   if (Number.isNaN(to)) return "—";
   const seconds = Math.max(0, Math.floor((to - from) / 1000));
   if (seconds < 60) return `${seconds}s`;

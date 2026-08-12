@@ -146,12 +146,12 @@ docs/design.md so the choices are documented."""
 WORKSPACE_LABELS: dict[str, str] = {
     "planner": "docs (planning) for writing; read access across the project",
     "backend_engineer": "backend/ in structured projects; the whole repo in adopted projects",
-    "frontend_engineer": "frontend/ in structured projects; the whole repo in adopted projects",
+    "frontend_engineer": "frontend/ and docs/ (design plan) in structured projects; the whole repo in adopted projects",
     "devops_engineer": "deployment/ in structured projects; the whole repo in adopted projects",
     "code_reviewer": "docs (review report) for writing; read access across the project",
 }
 
-SYSTEM_PROMPT_TEMPLATE = """You are {name} — {title} at an AI Software Agency.
+SYSTEM_PROMPT_TEMPLATE = """You are {name} — {title} at DevPilot AI.
 
 ## Role
 {description}

@@ -7,23 +7,24 @@ import type {
   Agent,
   AgentRuntime,
   AgentRunRequest,
+  AuditLog,
   ChatResponse,
   Deployment,
+  DeploymentLog,
+  DeploymentOptions,
   DeploymentValidate,
+  DeployLaunch,
+  DomainInfo,
   HealthStatus,
   LlmSettings,
   LlmSettingsInput,
   MemoryEntry,
-  Notification,
   PlanUploadResult,
   Project,
   ProjectDetail,
   ProviderTestResult,
-  Task,
-  TaskBoardRow,
+  WorkflowActivityPage,
   WorkflowRun,
-  WorkspaceFolder,
-  WorkspaceTree,
 } from "@/lib/types";
 
 export function useHealth(refetchInterval?: number) {
@@ -56,63 +57,6 @@ export function useCreateProject() {
       api.post<Project>("/projects", body),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["projects"] });
-    },
-  });
-}
-
-export function useProjectTasks(projectId: string) {
-  return useQuery({
-    queryKey: ["projects", projectId, "tasks"],
-    queryFn: () => api.get<Task[]>(`/tasks?project_id=${projectId}`),
-    enabled: !!projectId,
-  });
-}
-
-export function useProjectBoard(projectId: string) {
-  return useQuery({
-    queryKey: ["projects", projectId, "board"],
-    queryFn: () => api.get<TaskBoardRow[]>(`/projects/${projectId}/board`),
-    enabled: !!projectId,
-  });
-}
-
-export function useCreateTask(projectId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: {
-      title: string;
-      description?: string;
-      priority?: string;
-      owner?: string;
-      estimated_points?: number;
-    }) => api.post<Task>(`/projects/${projectId}/tasks`, body),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["projects", projectId, "tasks"] });
-      void qc.invalidateQueries({ queryKey: ["projects", projectId, "board"] });
-    },
-  });
-}
-
-export function useUpdateTask(projectId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { id: string } & Record<string, unknown>) =>
-      api.patch<Task>(`/tasks/${body.id}`, body),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["projects", projectId, "tasks"] });
-      void qc.invalidateQueries({ queryKey: ["projects", projectId, "board"] });
-      void qc.invalidateQueries({ queryKey: ["projects", projectId, "detail"] });
-    },
-  });
-}
-
-export function useAddComment(taskId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { author: string; body: string }) =>
-      api.post<Task["comments"][number]>(`/tasks/${taskId}/comments`, body),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["tasks", taskId] });
     },
   });
 }
@@ -152,6 +96,37 @@ export function useAgentRun() {
     mutationFn: (body: AgentRunRequest) =>
       api.post<WorkflowRun>("/agents/run", body),
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["workflows"] });
+    },
+  });
+}
+
+export function useWorkflowRun(runId: string | null, autoPoll = false) {
+  return useQuery({
+    queryKey: ["workflows", runId, "detail"],
+    queryFn: () => api.get<WorkflowRun>(`/workflows/${runId}`),
+    enabled: !!runId,
+    refetchInterval: autoPoll ? 2000 : false,
+  });
+}
+
+export function useWorkflowActivity(runId: string | null, autoPoll = true) {
+  return useQuery({
+    queryKey: ["workflows", runId, "activity"],
+    queryFn: () =>
+      api.get<WorkflowActivityPage>(`/workflows/${runId}/activity`),
+    enabled: !!runId && autoPoll,
+    refetchInterval: (query) =>
+      query.state.data?.done ? false : 1200,
+  });
+}
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (projectId: string) => api.delete(`/projects/${projectId}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["projects"] });
       void qc.invalidateQueries({ queryKey: ["workflows"] });
     },
   });
@@ -209,11 +184,11 @@ export function useMemory(agentKind?: string) {
   });
 }
 
-export function useNotifications() {
+export function useAuditLog() {
   return useQuery({
-    queryKey: ["notifications"],
-    queryFn: () => api.get<Notification[]>("/notifications?unread_only=true"),
-    refetchInterval: 15_000,
+    queryKey: ["audit"],
+    queryFn: () => api.get<AuditLog[]>("/audit"),
+    refetchInterval: 10_000,
   });
 }
 
@@ -234,6 +209,94 @@ export function useDeployments(projectId: string) {
     queryFn: () =>
       api.get<Deployment[]>(`/projects/${projectId}/deployments`),
     enabled: !!projectId,
+  });
+}
+
+export function useDeployOptions(projectId: string) {
+  return useQuery({
+    queryKey: ["projects", projectId, "deploy", "options"],
+    queryFn: () =>
+      api.get<DeploymentOptions>(`/projects/${projectId}/deploy/options`),
+    enabled: !!projectId,
+  });
+}
+
+export function useDeploymentStatus(projectId: string, autoPoll = false) {
+  return useQuery({
+    queryKey: ["projects", projectId, "deployment"],
+    queryFn: () =>
+      api.get<Deployment | null>(`/projects/${projectId}/deployment`),
+    enabled: !!projectId,
+    refetchInterval: autoPoll ? 2500 : false,
+  });
+}
+
+export function useDeploymentLogs(projectId: string, enabled = false) {
+  return useQuery({
+    queryKey: ["projects", projectId, "deployment", "logs"],
+    queryFn: () =>
+      api.get<DeploymentLog>(`/projects/${projectId}/deployment/logs`),
+    enabled: !!projectId && enabled,
+    refetchInterval: (query) =>
+      query.state.data?.status === "RUNNING" ? 2000 : false,
+  });
+}
+
+export function useDeployProject(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { provider: string; environment: string }) =>
+      api.post<DeployLaunch>(`/projects/${projectId}/deploy`, body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["projects", projectId, "deploy"] });
+      void qc.invalidateQueries({ queryKey: ["projects", projectId, "deployment"] });
+    },
+  });
+}
+
+export function useRedeployProject(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<DeployLaunch>(`/projects/${projectId}/redeploy`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["projects", projectId, "deploy"] });
+      void qc.invalidateQueries({ queryKey: ["projects", projectId, "deployment"] });
+    },
+  });
+}
+
+export function useRemoveDeployment(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.delete<Deployment>(`/projects/${projectId}/deployment`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["projects", projectId, "deploy"] });
+      void qc.invalidateQueries({ queryKey: ["projects", projectId, "deployment"] });
+    },
+  });
+}
+
+export function useAddDomain(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { domain: string }) =>
+      api.post<DomainInfo>(`/projects/${projectId}/domain`, body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["projects", projectId, "deployment"] });
+    },
+  });
+}
+
+export function useVerifyDomain(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<DomainInfo>(`/projects/${projectId}/domain/verify`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["projects", projectId, "deployment"] });
+    },
   });
 }
 
@@ -285,47 +348,6 @@ export function useExecuteDeployment(projectId: string) {
         queryKey: ["projects", projectId, "deploy"],
       });
     },
-  });
-}
-
-export function useWorkspaceFolders() {
-  return useQuery({
-    queryKey: ["workspace", "folders"],
-    queryFn: () => api.get<WorkspaceFolder[]>("/workspace/folders"),
-    refetchInterval: 15_000,
-  });
-}
-
-export function useCreateWorkspaceFolder() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { name: string; description?: string }) =>
-      api.post<WorkspaceFolder>("/workspace/folders", body),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["workspace", "folders"] });
-      void qc.invalidateQueries({ queryKey: ["projects"] });
-    },
-  });
-}
-
-export function useAdoptWorkspaceFolder() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { folder_name: string }) =>
-      api.post<WorkspaceFolder>("/workspace/folders/adopt", body),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["workspace", "folders"] });
-      void qc.invalidateQueries({ queryKey: ["projects"] });
-    },
-  });
-}
-
-export function useFolderTree(slug: string | null) {
-  return useQuery({
-    queryKey: ["workspace", "folders", slug, "tree"],
-    queryFn: () =>
-      api.get<WorkspaceTree>(`/workspace/folders/${slug}/tree`),
-    enabled: !!slug,
   });
 }
 

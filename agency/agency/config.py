@@ -41,15 +41,11 @@ class Settings(BaseSettings):
     )
 
     # --- App ---
-    app_name: str = "ai-agency"
     environment: Literal["development", "staging", "production", "test"] = "development"
     log_level: str = "INFO"
-    debug: bool = False
 
     # Paths (resolved relative to repository root)
     working_area: Path = Path("./working-area")
-    knowledge_root: Path = Path("./knowledge")
-    default_human_approval: bool = True
 
     # --- API ---
     api_host: str = "127.0.0.1"
@@ -63,22 +59,9 @@ class Settings(BaseSettings):
     db_pool_size: int = 10
     db_max_overflow: int = 20
 
-    # --- Redis / Celery ---
-    redis_url: str = "redis://localhost:6379/0"
-    celery_broker_url: str = "redis://localhost:6379/0"
-    celery_result_backend: str = "redis://localhost:6379/0"
-
-    # --- Object storage (optional, S3 compatible) ---
-    object_storage_endpoint: str | None = None
-    object_storage_bucket: str = "agency-artifacts"
-    object_storage_access_key: str | None = None
-    object_storage_secret_key: str | None = None
-
-    # --- Vector store / embeddings ---
-    vector_store_url: str | None = None
+    # --- Embeddings ---
     embedding_provider: Literal["", "openai", "huggingface", "local"] = "local"
     embedding_model: str = "text-embedding-3-small"
-    embedding_dimensions: int = 768
 
     # --- LLM ---
     llm_provider: Literal["null", "openai", "anthropic", "gemini", "ollama", "deepseek"] = "null"
@@ -121,18 +104,23 @@ class Settings(BaseSettings):
     # Overrides `deepseek_agents` for the listed agents.
     agent_models: dict[str, AgentModelConfig] = Field(default_factory=dict)
 
-    # --- Observability ---
-    langchain_tracing_v2: bool = False
-    langchain_api_key: str | None = None
-    langchain_project: str = "ai-agency"
-    otel_exporter_otlp_endpoint: str | None = None
-    prometheus_enabled: bool = True
-
     # --- Runtime ---
-    max_tool_rounds: int = 25
-    agent_heartbeat_seconds: int = 30
+    max_tool_rounds: int = 60
+    max_consecutive_failures: int = 5
 
-    @field_validator("working_area", "knowledge_root", mode="before")
+    # --- Workflow orchestration ---
+    # How many times the Code Reviewer may fail a review before the responsible
+    # agent is asked to fix and the loop re-runs. After this budget the run
+    # finishes with status REVIEW_FAILED and the human is notified.
+    max_review_retries: int = 3
+    # Create a git checkpoint (commit) before major agents and after each stage
+    # so the workflow can be rolled back safely. Best-effort: skipped silently
+    # when the project is not a git repo or no git identity is configured.
+    enable_git_checkpoints: bool = True
+    git_checkpoint_name: str = "DevPilot AI"
+    git_checkpoint_email: str = "agents@devpilot.local"
+
+    @field_validator("working_area", mode="before")
     @classmethod
     def _resolve_paths(cls, v: str | Path) -> Path:
         p = Path(v)
@@ -142,10 +130,6 @@ class Settings(BaseSettings):
     def agency_root(self) -> Path:
         """Backwards-compatible alias for the working area root."""
         return self.working_area
-
-    @property
-    def is_async_database(self) -> bool:
-        return "sqlite+aiosqlite" not in self.database_url or "asyncpg" in self.database_url
 
     @property
     def cors_origin_list(self) -> list[str]:

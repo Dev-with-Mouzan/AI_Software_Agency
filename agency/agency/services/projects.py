@@ -6,11 +6,11 @@ import re
 from pathlib import Path
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agency.config import get_settings
-from agency.db.models import Milestone, Project
+from agency.db.models import AgentMemory, Milestone, Project, WorkflowRun
 
 PROJECT_WORKSPACES = ["backend", "frontend", "deployment", "docs"]
 
@@ -109,6 +109,48 @@ class ProjectService:
     @staticmethod
     async def root_dir(project: Project) -> Path:
         return Path(project.root_dir)
+
+    @staticmethod
+    async def delete(
+        session: AsyncSession,
+        project_id: UUID,
+        *,
+        actor: str = "human",
+    ) -> bool:
+        """Delete a project and its dependent records.
+
+        Milestones, tasks, comments, knowledge chunks, workflow runs and
+        deployments cascade through their FKs; agent memory entries are removed
+        explicitly (no FK on `scope_id`). Workspace files on disk are left
+        untouched so adopted repositories are never harmed.
+        """
+        project = await session.get(Project, project_id)
+        if project is None:
+            return False
+
+        await session.execute(
+            delete(AgentMemory).where(
+                AgentMemory.scope_type == "project",
+                AgentMemory.scope_id == str(project_id),
+            )
+        )
+        await session.execute(
+            delete(WorkflowRun).where(WorkflowRun.project_id == project_id)
+        )
+        await session.execute(delete(Project).where(Project.id == project_id))
+        await session.flush()
+
+        from agency.permissions.audit import record
+
+        await record(
+            session,
+            actor=actor,
+            action="delete",
+            resource_type="project",
+            resource_id=str(project_id),
+            detail={"name": project.name, "slug": project.slug},
+        )
+        return True
 
 
 project_service = ProjectService()

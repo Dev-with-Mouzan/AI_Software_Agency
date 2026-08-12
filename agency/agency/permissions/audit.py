@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -9,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agency.core.enums import AuditAction
 from agency.db.models import AuditLog
+
+logger = logging.getLogger(__name__)
 
 
 async def record(
@@ -33,6 +36,9 @@ async def record(
             created_at=datetime.now(UTC),
         )
         session.add(entry)
-        await session.flush()
+        # Write inside a savepoint so a failing audit insert rolls back only
+        # itself and never the caller's in-flight transaction.
+        async with session.begin_nested():
+            await session.flush()
     except Exception:  # pragma: no cover
-        await session.rollback()
+        logger.exception("failed to write audit log entry")

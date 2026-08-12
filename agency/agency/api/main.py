@@ -1,7 +1,8 @@
-"""FastAPI application entrypoint for the AI Software Agency."""
+"""FastAPI application entrypoint for DevPilot AI."""
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -19,6 +20,8 @@ from agency.db.session import get_session_factory, init_db
 from agency.logging.setup import configure_logging
 from agency.observability.metrics import PrometheusMiddleware
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -29,12 +32,21 @@ async def lifespan(_: FastAPI):
             "API_TOKEN must be set when ENVIRONMENT=production — refusing to start unauthenticated."
         )
     await init_db()
-    # Register employees (idempotent).
+    # Register employees (idempotent) and load persisted LLM settings.
     async with get_session_factory()() as session:
+        from agency.services.settings import load_runtime_settings
+
+        await load_runtime_settings(session)
         await get_registry().seed(session)
         from agency.services.templates import seed_deployment_templates
 
         await seed_deployment_templates(session)
+        from agency.workflows.orchestrator import workflow_orchestrator
+
+        recovered = await workflow_orchestrator.recover_stale_runs(session)
+        if recovered:
+            logger.warning("recovered %d stale workflow run(s) after restart", recovered)
+        await session.commit()
     yield
 
 
@@ -42,7 +54,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     docs_enabled = settings.environment != "production"
     app = FastAPI(
-        title="AI Software Agency",
+        title="DevPilot AI",
         description=(
             "Multi-agent platform where specialized AI employees (Planner, Backend, "
             "Frontend, DevOps) work on projects in a working-area folder on your "
@@ -77,6 +89,7 @@ def create_app() -> FastAPI:
     app.include_router(routes.deployment.router, prefix="/api", dependencies=[Auth])
     app.include_router(routes.notifications.router, prefix="/api", dependencies=[Auth])
     app.include_router(routes.settings.router, prefix="/api", dependencies=[Auth])
+    app.include_router(routes.audit.router, prefix="/api", dependencies=[Auth])
 
     @app.get("/metrics")
     async def metrics(_: None = Auth) -> Response:

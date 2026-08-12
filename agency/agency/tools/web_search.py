@@ -1,6 +1,6 @@
 """Web research tools: let the Planner search the internet and read pages.
 
-Both tools are import-safe — the optional `duckduckgo-search` package is
+Both tools are import-safe — the optional `ddgs` package is
 loaded lazily and failures surface as clear tool errors instead of crashing
 the agent loop.
 
@@ -12,6 +12,7 @@ cloud metadata service.
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import json
 import re
@@ -24,7 +25,7 @@ import httpx
 from agency.tools.base import Tool, ToolContext, ToolResult
 
 _DDGS_ERROR = (
-    "The 'duckduckgo-search' package is not installed. Install it with: uv add duckduckgo-search"
+    "The 'ddgs' package is not installed. Install it with: uv add ddgs"
 )
 
 _MAX_REDIRECTS = 5
@@ -89,14 +90,11 @@ async def _safe_get(client: httpx.AsyncClient, url: str, headers: dict[str, str]
 
 
 def _ddgs_text(query: str, max_results: int) -> list[dict[str, str]]:
-    """Run a DuckDuckGo text search, tolerating both import paths."""
+    """Run a DuckDuckGo text search with the `ddgs` package."""
     try:
-        from ddgs import DDGS  # duckduckgo-search >= 7
-    except ImportError:
-        try:
-            from duckduckgo_search import DDGS  # type: ignore[no-redef]  # duckduckgo-search 6.x
-        except ImportError as exc:  # pragma: no cover
-            raise RuntimeError(_DDGS_ERROR) from exc
+        from ddgs import DDGS  # duckduckgo-search >= 7 renamed to `ddgs`
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError(_DDGS_ERROR) from exc
     with DDGS() as ddgs:
         results = ddgs.text(query, max_results=max_results)
     return [
@@ -132,7 +130,7 @@ class WebSearchTool(Tool):
         if not query:
             return ToolResult(False, error="query is required")
         try:
-            results = _ddgs_text(query, max_results)
+            results = await asyncio.to_thread(_ddgs_text, query, max_results)
         except RuntimeError as exc:
             return ToolResult(False, error=str(exc))
         except Exception as exc:

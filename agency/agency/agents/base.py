@@ -29,6 +29,7 @@ from agency.db.models import AgentRecord, Project, Task
 from agency.knowledge.index import KnowledgeBase
 from agency.llm.provider import BaseLLMProvider, LLMResponse, ToolCall, ToolSchema
 from agency.memory.manager import MemoryManager
+from agency.observability.activity import tool_target, tool_verb
 from agency.observability.metrics import (
     AGENT_RUNS,
     AGENT_STATUS,
@@ -47,6 +48,8 @@ class AgentRunContext:
     user_message: str = ""
     instructions: str = ""
     workflow_run_id: UUID | None = None
+    activity: Any | None = None  # ActivityReporter bound to a workflow step
+    write_dirs: list[str] | None = None  # architecture-driven write scope
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -55,6 +58,7 @@ class AgentResult:
     reply: str = ""
     actions: list[dict[str, Any]] = field(default_factory=list)
     needs_human: bool = False
+    failed: bool = False
     stats: dict[str, Any] = field(default_factory=dict)
     memory_written: int = 0
 
@@ -63,6 +67,7 @@ class AgentResult:
             "reply": self.reply,
             "actions": self.actions,
             "needs_human": self.needs_human,
+            "failed": self.failed,
             "stats": self.stats,
             "memory_written": self.memory_written,
         }
@@ -98,6 +103,7 @@ class BaseAgent:
         self.knowledge = knowledge
         self.tool_registry = tool_registry or {}
         self._max_rounds = get_settings().max_tool_rounds
+        self._max_consecutive_failures = get_settings().max_consecutive_failures
 
     # --- identity -------------------------------------------------------
     @property
@@ -119,22 +125,29 @@ class BaseAgent:
         result = AgentResult()
         messages: list[dict[str, Any]] = []
         await self._mark_status(ctx, AgentStatus.RUNNING)
+        self._activity(ctx, "phase", "running", "Reading project context and recalling memory…")
 
         try:
             # 1. Context retrieval
             memory_context = await self._recall_memory(ctx)
             knowledge_context = await self._search_knowledge(ctx)
+            self._activity(ctx, "phase", "completed", "Project context and memory loaded.")
 
             # 2. System prompt
             system_prompt = self._build_prompt(ctx, memory_context, knowledge_context)
             messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": ctx.user_message})
 
-            # 3-5. Agent loop
+            # 3-5. Agent loop. A failing method never stops the agent outright:
+            # the streak only grows when the SAME tool keeps failing, so trying
+            # a different approach resets it and keeps the agent working.
             consecutive_failures = 0
+            last_failed_tool: str | None = None
             had_failures = False
             for _round in range(self._max_rounds):
+                self._activity(ctx, "reasoning", "running", "Consulting the model…")
                 response = await self._chat(messages)
+                self._activity(ctx, "reasoning", "completed", "Model response received.")
                 assistant_msg: dict[str, Any] = {
                     "role": "assistant",
                     "content": response.text or "",
@@ -150,7 +163,28 @@ class BaseAgent:
 
                 stopped = False
                 for tool_call in to_execute:
+                    verb = tool_verb(tool_call.name)
+                    target = tool_target(tool_call.name, tool_call.arguments)
+                    self._activity(
+                        ctx,
+                        "tool",
+                        "running",
+                        f"{verb}{f' {target}' if target else ''}…",
+                        tool=tool_call.name,
+                        detail=target,
+                    )
                     tool_result = await self._execute_tool(ctx, tool_call.name, tool_call.arguments)
+                    if tool_result.success:
+                        self._activity(
+                            ctx, "tool", "completed", f"{verb} complete",
+                            tool=tool_call.name, detail=target,
+                        )
+                    else:
+                        self._activity(
+                            ctx, "tool", "failed", f"{verb} failed",
+                            tool=tool_call.name,
+                            detail=(tool_result.error or "")[:200],
+                        )
                     result.actions.append(
                         {
                             "tool": tool_call.name,
@@ -158,38 +192,81 @@ class BaseAgent:
                             "success": tool_result.success,
                         }
                     )
+                    if tool_result.success:
+                        consecutive_failures = 0
+                        last_failed_tool = None
+                    else:
+                        # Credit a NEW method: switching tools resets the streak
+                        # to 1, so only repeating the same failing approach can
+                        # accumulate toward the stop threshold.
+                        if tool_call.name == last_failed_tool:
+                            consecutive_failures += 1
+                        else:
+                            consecutive_failures = 1
+                        last_failed_tool = tool_call.name
+                        had_failures = True
+
+                    content = self._tool_result_text(tool_result)
+                    if not tool_result.success:
+                        content += (
+                            f"\n(Error {consecutive_failures}/"
+                            f"{self._max_consecutive_failures} for tool '{tool_call.name}'. "
+                            "Diagnose the error above and try a DIFFERENT approach — "
+                            "do not repeat the same failing method.)"
+                        )
                     messages.append(
                         {
                             "role": "tool",
                             "tool_call_id": tool_call.id,
                             "tool_name": tool_call.name,
-                            "content": self._tool_result_text(tool_result),
+                            "content": content,
                         }
                     )
-                    if tool_result.success:
-                        consecutive_failures = 0
-                    else:
-                        consecutive_failures += 1
-                        had_failures = True
-                        if consecutive_failures >= 2:
-                            result.reply = (
-                                f"Stopped after repeated tool failures: {tool_result.error}"
-                            )
-                            result.needs_human = True
-                            stopped = True
-                            break
+                    if not tool_result.success and consecutive_failures >= self._max_consecutive_failures:
+                        result.reply = (
+                            f"Stopped after repeated tool failures: {tool_result.error}"
+                        )
+                        result.needs_human = True
+                        result.failed = True
+                        stopped = True
+                        break
                 if stopped:
                     break
             else:
-                result.reply = result.reply or (
-                    "I reached my maximum tool round budget without finishing. "
-                    "Please ask the human for guidance."
+                # Budget exhausted while the model kept acting. Give it ONE
+                # final chance to wrap up with a summary instead of hard-failing
+                # a job that may already be done.
+                self._activity(
+                    ctx, "reasoning", "running",
+                    "Tool budget reached — asking the model to wrap up.",
                 )
-                result.needs_human = True
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            "You have used your entire tool budget. Do NOT call any "
+                            "more tools. If your task is done, reply NOW with your final "
+                            "summary and what you built. If it is not done, say exactly "
+                            "what remains and stop."
+                        ),
+                    }
+                )
+                wrap = await self._chat(messages)
+                if wrap.text and wrap.text.strip() and not wrap.tool_calls:
+                    result.reply = wrap.text.strip()
+                else:
+                    result.reply = (
+                        "I reached my maximum tool round budget without finishing. "
+                        "Please ask the human for guidance."
+                    )
+                    result.needs_human = True
+                    result.failed = True
 
             # 6. Memory: push short-term, summarize important content to long-term
+            self._activity(ctx, "phase", "running", "Recording memories and lessons…")
             self._push_short_term(ctx, result, messages)
             result.memory_written = await self._consolidate_memory(ctx, result, messages)
+            self._activity(ctx, "phase", "completed", "Memories recorded.")
 
             result.stats = {
                 "agent": self.kind,
@@ -199,12 +276,15 @@ class BaseAgent:
                 "had_failures": had_failures,
             }
             result.needs_human = result.needs_human or _wants_human(result.reply)
+            self._activity(ctx, "phase", "completed", "Final answer ready.")
             AGENT_RUNS.labels(agent_kind=self.kind, outcome="completed").inc()
             return result
         except Exception as exc:
+            self._activity(ctx, "phase", "failed", "Step failed during execution.", detail=str(exc)[:200])
             AGENT_RUNS.labels(agent_kind=self.kind, outcome="error").inc()
             result.reply = f"Error during execution: {exc}"
             result.needs_human = True
+            result.failed = True
             result.stats["error"] = str(exc)
             await self._mark_status(ctx, AgentStatus.ERROR)
             return result
@@ -214,6 +294,19 @@ class BaseAgent:
                 await self._mark_status(ctx, AgentStatus.IDLE)
 
     # --- loop internals -------------------------------------------------
+    def _activity(
+        self,
+        ctx: AgentRunContext,
+        kind: str,
+        status: str,
+        message: str,
+        tool: str = "",
+        detail: str = "",
+    ) -> None:
+        """Emit a workflow activity event (no-op outside a workflow run)."""
+        if ctx.activity is not None:
+            ctx.activity.report(kind, status, message, tool=tool, detail=detail)
+
     async def _chat(self, messages: list[dict[str, Any]]) -> LLMResponse:
         settings = get_settings()
         return await self.llm.chat(
@@ -252,6 +345,7 @@ class BaseAgent:
         policy = PermissionPolicy(
             project_root=ctx.project.root_dir if ctx.project else None,
             workspace_mode=ctx.project.workspace_mode if ctx.project else "structured",
+            write_dirs=ctx.write_dirs,
         )
         decision = policy.check_tool(self.kind, name)
         if not decision.allowed:
@@ -435,7 +529,12 @@ class BaseAgent:
     def _tool_result_text(self, result: ToolResult) -> str:
         if result.success:
             return f"OK\n{result.output[:4000]}"
-        return f"ERROR\n{result.error[:4000]}"
+        body = (result.error or "").strip()
+        output = (result.output or "").strip()
+        if output:
+            tail = "\n".join(output.splitlines()[-10:])
+            body = f"{body}\n[output]\n{tail}" if body else tail
+        return f"ERROR\n{body[:4000]}"
 
 
 # --- helpers --------------------------------------------------------------

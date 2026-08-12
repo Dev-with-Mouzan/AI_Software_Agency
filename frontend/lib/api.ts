@@ -1,5 +1,8 @@
 const API_URL = "/api/proxy";
 
+const REQUEST_TIMEOUT_MS = 30_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
+
 export class ApiClientError extends Error {
   status: number;
   detail: string;
@@ -12,26 +15,60 @@ export class ApiClientError extends Error {
   }
 }
 
+function timeoutSignal(ms: number): { signal: AbortSignal; done: () => void } {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, done: () => clearTimeout(id) };
+}
+
+function requestError(err: unknown, path: string, timeoutMs: number): ApiClientError {
+  if (err instanceof DOMException && err.name === "AbortError") {
+    return new ApiClientError(
+      0,
+      `Request to ${path} timed out after ${Math.round(timeoutMs / 1000)}s.`,
+    );
+  }
+  return new ApiClientError(
+    0,
+    `Cannot reach the agency API at ${API_URL}. Is the backend running?`,
+  );
+}
+
+async function readJson<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  if (!text) return undefined as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new ApiClientError(
+      res.status,
+      "The agency API returned an unexpected (non-JSON) response.",
+    );
+  }
+}
+
 async function request<T>(
   path: string,
   init?: RequestInit,
+  timeoutMs = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
 
+  const { signal, done } = timeoutSignal(timeoutMs);
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       ...init,
       headers: { ...headers, ...(init?.headers ?? {}) },
       cache: "no-store",
+      signal,
     });
-  } catch {
-    throw new ApiClientError(
-      0,
-      `Cannot reach the agency API at ${API_URL}. Is the backend running?`,
-    );
+  } catch (err) {
+    throw requestError(err, path, timeoutMs);
+  } finally {
+    done();
   }
 
   if (!res.ok) {
@@ -48,7 +85,7 @@ async function request<T>(
   if (res.status === 204) {
     return undefined as T;
   }
-  return (await res.json()) as T;
+  return readJson<T>(res);
 }
 
 export const api = {
@@ -82,18 +119,19 @@ export async function uploadFile<T>(
   const form = new FormData();
   form.append(field, file);
 
+  const { signal, done } = timeoutSignal(UPLOAD_TIMEOUT_MS);
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       method: "POST",
       body: form,
       cache: "no-store",
+      signal,
     });
-  } catch {
-    throw new ApiClientError(
-      0,
-      `Cannot reach the agency API at ${API_URL}. Is the backend running?`,
-    );
+  } catch (err) {
+    throw requestError(err, path, UPLOAD_TIMEOUT_MS);
+  } finally {
+    done();
   }
 
   if (!res.ok) {
@@ -106,7 +144,42 @@ export async function uploadFile<T>(
     }
     throw new ApiClientError(res.status, detail);
   }
-  return (await res.json()) as T;
+  return readJson<T>(res);
+}
+
+export async function fetchBlob(path: string): Promise<Blob> {
+  const { signal, done } = timeoutSignal(UPLOAD_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { cache: "no-store", signal });
+  } catch (err) {
+    throw requestError(err, path, UPLOAD_TIMEOUT_MS);
+  } finally {
+    done();
+  }
+
+  if (!res.ok) {
+    let detail = `Request failed with status ${res.status}`;
+    try {
+      const body = (await res.json()) as { detail?: string | Array<unknown> };
+      if (typeof body.detail === "string") detail = body.detail;
+    } catch {
+      // keep default message
+    }
+    throw new ApiClientError(res.status, detail);
+  }
+  return res.blob();
+}
+
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 export const AGENTS = [
@@ -147,11 +220,3 @@ export const DEPLOY_PLATFORMS = [
   "netlify",
 ] as const;
 
-export const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
-export const TASK_STATUSES = [
-  "BACKLOG",
-  "IN_PROGRESS",
-  "IN_REVIEW",
-  "DONE",
-  "BLOCKED",
-] as const;

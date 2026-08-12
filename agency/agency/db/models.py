@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models for the AI Software Agency.
+"""SQLAlchemy ORM models for DevPilot AI.
 
 Persistence for projects, milestones, tasks, agents, memory, knowledge,
 workflows, deployments, audit log and notifications.
@@ -12,7 +12,6 @@ from datetime import datetime
 from sqlalchemy import (
     JSON,
     Boolean,
-    DateTime,
     Float,
     ForeignKey,
     Integer,
@@ -32,7 +31,7 @@ from agency.core.enums import (
     TaskStatus,
     WorkflowStatus,
 )
-from agency.db.base import Base, UUIDPkMixin
+from agency.db.base import Base, UTCDateTime, UUIDPkMixin
 
 
 class Project(UUIDPkMixin, Base):
@@ -69,7 +68,7 @@ class Milestone(UUIDPkMixin, Base):
     description: Mapped[str] = mapped_column(Text, default="")
     order_index: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(40), default="TODO")
-    target_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    target_date: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
     project: Mapped[Project] = relationship(back_populates="milestones", lazy="joined")
     tasks: Mapped[list[Task]] = relationship(back_populates="milestone", lazy="selectin")
@@ -126,7 +125,7 @@ class AgentRecord(UUIDPkMixin, Base):
     workspace: Mapped[str] = mapped_column(String(100), nullable=False)  # relative dir
     allowed_tools: Mapped[list] = mapped_column(JSON, default=list)
     capabilities: Mapped[list] = mapped_column(JSON, default=list)
-    heartbeat: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    heartbeat: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class AgentMemory(UUIDPkMixin, Base):
@@ -172,8 +171,8 @@ class WorkflowRun(UUIDPkMixin, Base):
     current_step: Mapped[str] = mapped_column(String(100), default="")
     context: Mapped[dict] = mapped_column(JSON, default=dict)
     result: Mapped[dict] = mapped_column(JSON, default=dict)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
     project: Mapped[Project | None] = relationship(back_populates="workflows", lazy="joined")
     steps: Mapped[list[WorkflowStep]] = relationship(
@@ -198,8 +197,8 @@ class WorkflowStep(UUIDPkMixin, Base):
     agent_kind: Mapped[str | None] = mapped_column(String(50), nullable=True)
     detail: Mapped[str] = mapped_column(Text, default="")
     output: Mapped[dict] = mapped_column(JSON, default=dict)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
     run: Mapped[WorkflowRun] = relationship(back_populates="steps", lazy="joined")
 
@@ -216,9 +215,24 @@ class Deployment(UUIDPkMixin, Base):
     checks: Mapped[dict] = mapped_column(JSON, default=dict)
     approved: Mapped[bool] = mapped_column(Boolean, default=False)
     approved_by: Mapped[str] = mapped_column(String(100), default="")
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    deployed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    deployed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     error: Mapped[str] = mapped_column(Text, default="")
+
+    # Provider-based deployments (AWS / Vercel). Never stores credentials.
+    provider: Mapped[str] = mapped_column(String(40), default="")
+    deployment_url: Mapped[str] = mapped_column(Text, default="")
+    project_url: Mapped[str] = mapped_column(Text, default="")
+    deployment_id: Mapped[str] = mapped_column(String(200), default="")
+    custom_domain: Mapped[str] = mapped_column(String(300), default="")
+    domain_status: Mapped[str] = mapped_column(
+        String(30), default="none"
+    )  # none | pending_dns | verifying | active | failed
+    dns_records: Mapped[dict] = mapped_column(JSON, default=dict)
+    deployed_commit: Mapped[str] = mapped_column(String(100), default="")
+    run_id: Mapped[str] = mapped_column(String(36), default="")
+    logs: Mapped[list] = mapped_column(JSON, default=list)
+    removed: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class AuditLog(UUIDPkMixin, Base):
@@ -232,7 +246,7 @@ class AuditLog(UUIDPkMixin, Base):
     resource_id: Mapped[str] = mapped_column(String(80), default="")
     allowed: Mapped[bool] = mapped_column(Boolean, default=True)
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
 
 class Notification(UUIDPkMixin, Base):
@@ -260,4 +274,4 @@ class SettingsRecord(Base):
     default_provider: Mapped[str] = mapped_column(String(40), default="")
     providers: Mapped[dict] = mapped_column(JSON, default=dict)
     agents: Mapped[dict] = mapped_column(JSON, default=dict)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime)

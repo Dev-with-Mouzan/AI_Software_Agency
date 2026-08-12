@@ -2,12 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 import uuid
 
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from agency.api.middleware import RateLimitMiddleware
+
+
+async def _wait_run(client, run_id, timeout: float = 10.0) -> dict:
+    """Poll a run until it leaves the RUNNING state (background execution)."""
+    deadline = time.monotonic() + timeout
+    while True:
+        resp = await client.get(f"/api/workflows/{run_id}")
+        assert resp.status_code == 200, resp.text
+        run = resp.json()
+        if run["status"] not in {"RUNNING", "IN_PROGRESS", "PENDING"}:
+            return run
+        if time.monotonic() > deadline:
+            raise AssertionError(f"run {run_id} did not finish within {timeout}s")
+        await asyncio.sleep(0.05)
 
 
 async def test_health(client) -> None:
@@ -98,19 +114,76 @@ async def test_memory_search(client) -> None:
 
 async def test_command_run_via_api(client) -> None:
     proj = (await client.post("/api/projects", json={"name": "WF"})).json()
-    run = (
+    created = (
         await client.post(
             "/api/agents/run",
             json={"project_id": proj["id"], "agents": ["planner"], "command": "Plan a portal"},
         )
     ).json()
+    assert created["status"] == "RUNNING"
+    assert created["kind"] == "command"
+
+    run = await _wait_run(client, created["id"])
     assert run["status"] == "COMPLETED"
-    assert run["kind"] == "command"
     assert run["steps"], "steps should be persisted"
     assert [s["agent_kind"] for s in run["steps"]] == ["planner"]
 
     listed = (await client.get(f"/api/workflows?project_id={proj['id']}")).json()
     assert any(r["id"] == run["id"] for r in listed)
+
+
+async def test_workflow_activity_endpoint(client) -> None:
+    proj = (await client.post("/api/projects", json={"name": "ACT"})).json()
+    created = (
+        await client.post(
+            "/api/agents/run",
+            json={"project_id": proj["id"], "agents": ["planner"], "command": "Plan a portal"},
+        )
+    ).json()
+    await _wait_run(client, created["id"])
+
+    feed = (await client.get(f"/api/workflows/{created['id']}/activity")).json()
+    assert feed["run_id"] == created["id"]
+    assert feed["done"] is True
+    assert feed["activities"], "run should record activity events"
+    assert feed["activities"][0]["kind"] in {"run", "step", "phase", "reasoning", "tool"}
+
+    missing = await client.get(f"/api/workflows/{uuid.uuid4()}/activity")
+    assert missing.status_code == 404
+
+
+async def test_activity_shows_every_step(client) -> None:
+    """Every agent step must surface as its own section in the activity feed.
+
+    Covers both the live feed and the synthetic fallback (after the in-memory
+    store is cleared, e.g. a server restart) for a multi-step run.
+    """
+    from agency.observability.activity import activity_store
+
+    proj = (await client.post("/api/projects", json={"name": "MULTI"})).json()
+    created = (
+        await client.post(
+            "/api/agents/run",
+            json={
+                "project_id": proj["id"],
+                "agents": ["planner", "backend_engineer"],
+                "command": "Plan a portal",
+            },
+        )
+    ).json()
+    await _wait_run(client, created["id"], timeout=30)
+    run_id = created["id"]
+
+    feed = (await client.get(f"/api/workflows/{run_id}/activity")).json()
+    step_kinds = {a["agent_kind"] for a in feed["activities"] if a["kind"] == "step"}
+    assert step_kinds == {"planner", "backend_engineer"}
+
+    activity_store.clear(run_id)
+    synthetic = (await client.get(f"/api/workflows/{run_id}/activity")).json()
+    assert synthetic["done"] is True
+    step_events = [a for a in synthetic["activities"] if a["kind"] == "step"]
+    assert [a["agent_kind"] for a in step_events] == ["planner", "backend_engineer"]
+    assert all(a["status"] in {"completed", "failed"} for a in step_events)
 
 
 async def test_workspace_endpoints(client) -> None:
@@ -165,7 +238,7 @@ async def test_plan_upload_then_run(client) -> None:
     )
     assert bad_ext.status_code == 422
 
-    run = (
+    created = (
         await client.post(
             "/api/agents/run",
             json={
@@ -176,6 +249,8 @@ async def test_plan_upload_then_run(client) -> None:
             },
         )
     ).json()
+    assert created["status"] == "RUNNING"
+    run = await _wait_run(client, created["id"])
     assert run["status"] == "COMPLETED"
     assert run["context"]["plan_source"] == "upload"
 

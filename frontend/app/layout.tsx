@@ -2,16 +2,18 @@ import type { Metadata } from "next";
 
 import { Providers } from "@/components/providers";
 import { ThemeProvider } from "@/components/theme-provider";
-import { TopNav } from "@/components/layout/top-nav";
+import { SiteNavbar } from "@/components/layout/site-navbar";
+import { SiteFooter } from "@/components/layout/site-footer";
+import { GlobalChatbot } from "@/components/global-chatbot";
 import { ToastProvider } from "@/components/ui/toast";
 import { AppMain } from "@/components/motion/app-main";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Agency — AI software studio",
+  title: "DevPilot AI — AI software studio",
   description:
-    "Command center for the multi-agent software agency. Projects, your team, runs, deployments.",
+    "Command center for the multi-agent software studio. Projects, your team, runs, deployments.",
 };
 
 const themeScript = `(function(){try{var t=localStorage.getItem('agency-theme');if(t==='light'){document.documentElement.classList.add('light')}}catch(e){}})();`;
@@ -27,11 +29,15 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="bg-bg font-sans text-text antialiased">
+        <div id="top" className="site-atmosphere" aria-hidden />
+        <div className="site-grid" aria-hidden />
         <Providers>
           <ThemeProvider>
             <ToastProvider>
-              <TopNav />
+              <SiteNavbar />
               <AppMain>{children}</AppMain>
+              <SiteFooter />
+              <GlobalChatbot />
             </ToastProvider>
           </ThemeProvider>
         </Providers>

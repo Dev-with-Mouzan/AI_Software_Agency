@@ -20,7 +20,7 @@ export interface Project {
   updated_at: string;
 }
 
-export interface Milestone {
+interface Milestone {
   id: string;
   project_id: string;
   name: string;
@@ -36,36 +36,6 @@ export interface ProjectDetail extends Project {
   milestones: Milestone[];
   task_stats: Record<string, number>;
   agent_stats: Record<string, string>;
-}
-
-export interface TaskComment {
-  id: string;
-  task_id: string;
-  author: string;
-  body: string;
-  created_at: string;
-}
-
-export interface Task {
-  id: string;
-  project_id: string;
-  milestone_id: string | null;
-  title: string;
-  description: string;
-  priority: string;
-  status: string;
-  owner: string | null;
-  dependencies: string[];
-  files_affected: string[];
-  review_status: string;
-  estimated_points: number;
-  created_at: string;
-  updated_at: string;
-  comments: TaskComment[];
-}
-
-export interface TaskBoardRow extends Task {
-  blocked_by: string[];
 }
 
 export interface Agent {
@@ -94,6 +64,7 @@ export interface AgentRuntime {
   last_activity: string | null;
   short_term: Record<string, unknown>[];
   stats: Record<string, unknown>;
+  llm_error: string;
 }
 
 export interface ChatResponse {
@@ -133,7 +104,106 @@ export interface WorkflowRun {
   steps: WorkflowStep[];
 }
 
-export interface DeploymentCheck {
+type WorkflowActivityKind =
+  | "run"
+  | "step"
+  | "phase"
+  | "reasoning"
+  | "tool"
+  | "review"
+  | "agent.started"
+  | "agent.file_created"
+  | "agent.file_modified"
+  | "review.started"
+  | "review.completed"
+  | "review.failed"
+  | "review.retry_started"
+  | "workflow.started"
+  | "workflow.completed"
+  | "workflow.failed"
+  | "workflow.review_failed"
+  | "workflow.checkpoint";
+
+export type WorkflowActivityStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed";
+
+export interface WorkflowActivity {
+  seq: number;
+  run_id: string;
+  step_id: string;
+  agent_kind: string;
+  agent_name: string;
+  kind: WorkflowActivityKind;
+  status: WorkflowActivityStatus;
+  message: string;
+  tool: string;
+  detail: string;
+  metadata?: Record<string, unknown>;
+  ts: string;
+}
+
+export interface WorkflowActivityPage {
+  run_id: string;
+  status: string;
+  done: boolean;
+  activities: WorkflowActivity[];
+}
+
+type ReviewSeverity =
+  | "critical"
+  | "high"
+  | "medium"
+  | "low"
+  | "suggestion";
+
+export interface ReviewIssue {
+  severity: ReviewSeverity;
+  file: string;
+  line: number;
+  title: string;
+  why: string;
+  fix: string;
+  agent: string;
+}
+
+export interface ReviewResult {
+  status: "passed" | "failed";
+  score: number;
+  issues: ReviewIssue[];
+  files_reviewed: string[];
+  required_fixes: string[];
+  summary: string;
+  unstructured?: boolean;
+}
+
+interface WorkflowSummaryAgent {
+  kind: string;
+  name: string;
+  status: string;
+}
+
+export interface WorkflowSummary {
+  project_request: string;
+  project_type: string;
+  architecture: Record<string, unknown>;
+  agents: WorkflowSummaryAgent[];
+  files: { created: number; modified: number; deleted: number };
+  files_created: string[];
+  files_modified: string[];
+  review: ReviewResult | null;
+  checkpoints: Array<{
+    label: string;
+    created: boolean;
+    commit?: string;
+    reason?: string;
+  }>;
+  structure: string[];
+}
+
+interface DeploymentCheck {
   name: string;
   passed: boolean;
   detail: string;
@@ -168,6 +238,62 @@ export interface Deployment {
   error: string;
   created_at: string;
   updated_at: string;
+
+  provider: string;
+  deployment_url: string;
+  project_url: string;
+  deployment_id: string;
+  custom_domain: string;
+  domain_status: string;
+  dns_records: Record<string, unknown> | unknown[];
+  deployed_commit: string;
+  run_id: string;
+  logs: DeploymentLogItem[];
+  removed: boolean;
+}
+
+interface DeploymentProviderOption {
+  name: string;
+  label: string;
+  configured: boolean;
+  missing: string[];
+  compatible: boolean;
+  reason: string;
+  project_type: string;
+  technology_stack: Record<string, unknown>;
+}
+
+export interface DeploymentOptions {
+  project_type: string;
+  technology_stack: Record<string, unknown>;
+  providers: DeploymentProviderOption[];
+}
+
+interface DeploymentLogItem {
+  ts: string;
+  level: string;
+  message: string;
+  detail: string;
+}
+
+export interface DeploymentLog {
+  deployment_id: string | null;
+  status: string;
+  logs: DeploymentLogItem[];
+}
+
+export interface DeployLaunch {
+  deployment: Deployment;
+  run: WorkflowRun;
+}
+
+export interface DomainInfo {
+  domain: string;
+  status: string;
+  dns_records: Record<string, unknown> | unknown[];
+  message: string;
+  verified: boolean;
+  ssl: string;
 }
 
 export interface MemoryEntry {
@@ -182,15 +308,6 @@ export interface MemoryEntry {
   created_at: string;
 }
 
-export interface WorkspaceFolder {
-  name: string;
-  slug: string;
-  registered: boolean;
-  project_id: string | null;
-  file_count: number;
-  root_dir: string;
-}
-
 export interface FolderEntry {
   name: string;
   type: "dir" | "file";
@@ -198,13 +315,22 @@ export interface FolderEntry {
   children: number;
 }
 
-export interface WorkspaceTree {
+export interface DirListing {
   slug: string;
-  root_dir: string;
-  registered: boolean;
-  project_id: string | null;
+  path: string;
   entries: FolderEntry[];
   file_count: number;
+}
+
+export interface FileContent {
+  path: string;
+  name: string;
+  size: number;
+  content: string;
+  truncated: boolean;
+  binary: boolean;
+  redacted: boolean;
+  reason: string;
 }
 
 export interface AgentRunRequest {
@@ -222,17 +348,18 @@ export interface PlanUploadResult {
   size: number;
 }
 
-export interface Notification {
+export interface AuditLog {
   id: string;
-  recipient: string;
-  kind: string;
-  title: string;
-  body: string;
-  read: boolean;
+  actor: string;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  allowed: boolean;
+  detail: Record<string, unknown>;
   created_at: string;
 }
 
-export interface ProviderStatus {
+interface ProviderStatus {
   provider: string;
   label: string;
   model: string;
@@ -241,7 +368,7 @@ export interface ProviderStatus {
   key_masked: string;
 }
 
-export interface AgentRoute {
+interface AgentRoute {
   kind: string;
   name: string;
   provider: string;
@@ -276,9 +403,5 @@ export interface LlmSettingsInput {
 
 export interface ProviderTestResult {
   ok: boolean;
-  detail: string;
-}
-
-export interface ApiError {
   detail: string;
 }

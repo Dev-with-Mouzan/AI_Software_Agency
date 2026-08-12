@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, UploadFile
+from sqlalchemy.exc import OperationalError
 
 from agency.api.deps import DbSession
 from agency.knowledge.index import KnowledgeBase
@@ -18,13 +20,37 @@ from agency.schemas.project import (
     ProjectOut,
     ProjectUpdate,
 )
+from agency.schemas.workspace import WorkspaceTreeOut
 from agency.services.plans import PlanError, plan_service
 from agency.services.projects import project_service
 from agency.services.tasks import task_service
+from agency.services.workspace import WorkspaceError, workspace_service
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 MAX_PLAN_BYTES = 2_000_000  # 2 MB
+
+
+async def _delete_project_with_retry(
+    session: DbSession, project_id: UUID, *, attempts: int = 4
+) -> bool:
+    """Delete a project, retrying on SQLite write-lock contention.
+
+    A workflow run may hold the write lock when the human deletes the project
+    at the same moment; WAL mode lets concurrent readers through but a DELETE
+    needs the single writer slot, so a brief retry avoids spurious 500s.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            deleted = await project_service.delete(session, project_id, actor="human")
+            await session.commit()
+            return deleted
+        except OperationalError as exc:
+            if "locked" not in str(exc).lower() or attempt == attempts:
+                raise
+            await session.rollback()
+            await asyncio.sleep(0.2 * attempt)
+    return False
 
 
 @router.post("", response_model=ProjectOut, status_code=201)
@@ -79,6 +105,14 @@ async def update_project(
     return ProjectOut.model_validate(project)
 
 
+@router.delete("/{project_id}", status_code=204)
+async def delete_project(project_id: UUID, session: DbSession) -> None:
+    """Delete a project and all of its dependent records."""
+    deleted = await _delete_project_with_retry(session, project_id)
+    if not deleted:
+        raise HTTPException(404, "project not found")
+
+
 @router.post("/{project_id}/milestones", response_model=MilestoneOut, status_code=201)
 async def add_milestone(project_id: UUID, payload: MilestoneIn, session: DbSession) -> MilestoneOut:
     project = await project_service.get(session, project_id)
@@ -105,6 +139,19 @@ async def index_knowledge(project_id: UUID, session: DbSession) -> dict:
     count = await kb.index_project(session, project_id, Path(project.root_dir))
     await session.commit()
     return {"indexed": count, "project_id": str(project_id)}
+
+
+@router.get("/{project_id}/structure", response_model=WorkspaceTreeOut)
+async def project_structure(project_id: UUID, session: DbSession) -> WorkspaceTreeOut:
+    """Top-level file tree for a project (drives the project viewer)."""
+    project = await project_service.get(session, project_id)
+    if project is None:
+        raise HTTPException(404, "project not found")
+    try:
+        tree = await workspace_service.folder_tree(session, project.slug)
+    except WorkspaceError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return WorkspaceTreeOut(**tree)
 
 
 @router.post("/{project_id}/plan", response_model=PlanUploadOut, status_code=201)

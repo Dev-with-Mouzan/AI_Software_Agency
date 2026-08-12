@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-PROVIDER_IDS = ("openai", "gemini", "deepseek", "qwen")
-
 
 class ProviderConfigIn(BaseModel):
     """Inbound provider config from the Settings form. An empty api_key keeps
@@ -45,7 +43,7 @@ class ProviderStatusOut(BaseModel):
 
 
 class AgentModelOut(BaseModel):
-    """Per-agent effective routing (runtime assignment or resolved default)."""
+    """Per-agent explicit model assignment; provider/model empty when inheriting."""
 
     kind: str
     name: str
@@ -60,16 +58,6 @@ class SettingsOut(BaseModel):
     default_provider: str = ""
     providers: list[ProviderStatusOut] = Field(default_factory=list)
     agents: list[AgentModelOut] = Field(default_factory=list)
-
-
-class TestProviderIn(BaseModel):
-    """Credentials to validate with a tiny prompt. `api_key` optional — when
-    empty the stored/env credentials for the provider are used."""
-
-    provider: str = Field(pattern="^(openai|gemini|deepseek|qwen)$")
-    api_key: str = Field(default="", max_length=400)
-    model: str = Field(default="", max_length=120)
-    base_url: str = Field(default="", max_length=300)
 
 
 class TestProviderOut(BaseModel):

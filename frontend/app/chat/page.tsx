@@ -31,7 +31,7 @@ export default function ChatPage() {
       id: 0,
       role: "agent",
       agent_kind: "routing",
-      agent: "Agency router",
+      agent: "DevPilot router",
       content:
         "I route your message to the right agent automatically. What would you like to delegate? You can scope it to a project below.",
     },
@@ -99,7 +99,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8.5rem)] max-w-4xl flex-col">
+    <div className="mx-auto flex h-[calc(100dvh-8.5rem)] max-w-4xl flex-col">
       <Card className="flex flex-1 flex-col overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-edge-soft px-5 py-3">
           <div className="flex items-center gap-2.5">
@@ -115,7 +115,7 @@ export default function ChatPage() {
               </p>
             </div>
           </div>
-          <div className="ml-auto w-56">
+          <div className="ml-auto w-full sm:w-56">
             <Select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
@@ -131,7 +131,7 @@ export default function ChatPage() {
           </div>
         </div>
 
-        <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
+        <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto px-5 py-5">
           <AnimatePresence initial={false}>
             {messages.map((message) => {
               const isUser = message.role === "user";
@@ -161,7 +161,7 @@ export default function ChatPage() {
                   }`}
                 >
                   {!isUser && (
-                    <div className="mb-1.5 flex items-center gap-2">
+                    <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="font-display text-xs font-semibold tracking-tight text-text-dim">
                         {message.agent ?? "Agent"}
                       </span>

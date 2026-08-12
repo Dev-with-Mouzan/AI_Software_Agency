@@ -44,7 +44,7 @@ function StepPills({ run }: { run: WorkflowRun }) {
             !isStepDone(step.status) &&
               !isStepRunning(step.status) &&
               !isStepFailed(step.status) &&
-              "border-edge-soft bg-surface-2/60 text-faint",
+              "border-edge-soft bg-surface-2/60 text-muted",
           )}
         >
           {stepLabel(step)}
@@ -99,12 +99,12 @@ function RunRow({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Badge tone="primary">{run.kind}</Badge>
-            <span className="font-mono text-[10px] tracking-[0.06em] text-faint">
+            <span className="font-mono text-[10px] tracking-[0.06em] text-muted">
               #{shortId(run.id)}
             </span>
           </div>
           {description && (
-            <p className="mt-1 truncate text-[11px] text-muted">{description}</p>
+            <p className="mt-1 truncate text-xs text-text-dim">{description}</p>
           )}
         </div>
 
@@ -114,7 +114,7 @@ function RunRow({
 
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between text-[10px]">
-            <span className="text-faint">
+            <span className="text-muted">
               {completed}/{total} steps
             </span>
             <span className="font-mono font-medium text-text-dim">{percent}%</span>
@@ -124,10 +124,10 @@ function RunRow({
 
         <div className="flex items-center justify-end gap-2">
           <div className="text-right">
-            <p className="text-[11px] text-text-dim">{formatDate(run.started_at)}</p>
-            <p className="font-mono text-[10px] text-faint">{runDuration(run)}</p>
+            <p className="text-[11px] font-medium text-text-dim">{formatDate(run.started_at)}</p>
+            <p className="font-mono text-[10px] text-muted">{runDuration(run)}</p>
           </div>
-          <ArrowUpRight className="h-4 w-4 text-faint transition-colors group-hover:text-primary" />
+          <ArrowUpRight className="h-4 w-4 text-muted transition-colors group-hover:text-primary" />
         </div>
       </div>
 
@@ -141,12 +141,12 @@ function RunRow({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <Badge tone="primary">{run.kind}</Badge>
-                <span className="font-mono text-[10px] tracking-[0.06em] text-faint">
+                <span className="font-mono text-[10px] tracking-[0.06em] text-muted">
                   #{shortId(run.id)}
                 </span>
               </div>
               {description && (
-                <p className="mt-0.5 truncate text-[11px] text-muted">{description}</p>
+                <p className="mt-0.5 truncate text-xs text-text-dim">{description}</p>
               )}
             </div>
           </div>
@@ -157,16 +157,16 @@ function RunRow({
 
         <div className="flex items-center gap-3">
           <Progress value={percent} tone={running ? "info" : meta.tone} className="flex-1" />
-          <span className="font-mono text-[10px] tracking-[0.06em] text-faint">
+          <span className="font-mono text-[10px] tracking-[0.06em] text-muted">
             {completed}/{total} · {percent}%
           </span>
         </div>
 
         <div className="flex items-center justify-between border-t border-edge-soft pt-2">
-          <span className="text-[11px] text-faint">
+          <span className="text-[11px] font-medium text-text-dim">
             {formatDate(run.started_at)} · {runDuration(run)}
           </span>
-          <ArrowUpRight className="h-4 w-4 text-faint transition-colors group-hover:text-primary" />
+          <ArrowUpRight className="h-4 w-4 text-muted transition-colors group-hover:text-primary" />
         </div>
       </div>
     </motion.button>
@@ -182,7 +182,7 @@ export function RunHistory({
 }) {
   return (
     <div>
-      <div className="mb-2 hidden items-center gap-4 px-4 font-mono text-[9px] uppercase tracking-[0.16em] text-faint md:grid md:grid-cols-[150px_minmax(0,1fr)_minmax(0,1fr)_170px_110px]">
+      <div className="mb-2 hidden items-center gap-4 px-4 font-mono text-[9px] uppercase tracking-[0.16em] text-muted md:grid md:grid-cols-[150px_minmax(0,1fr)_minmax(0,1fr)_170px_110px]">
         <span>Status</span>
         <span>Run</span>
         <span>Steps</span>

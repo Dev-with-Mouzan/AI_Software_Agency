@@ -1,24 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { FileUp, Play, Sparkles, Terminal } from "lucide-react";
+import { ArrowRight, Check, FileUp, Play, Sparkles, Terminal } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
-import { Field, Input, Select, Textarea } from "@/components/ui/input";
+import { FileDropzone } from "@/components/ui/file-dropzone";
+import { Field, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { ActivityPanel } from "@/components/workflows/activity-panel";
 import { AGENTS, DEPLOY_PLATFORMS, ApiClientError } from "@/lib/api";
 import { useAgentRun, useProjects, useUploadPlan } from "@/lib/hooks";
+import type { WorkflowRun } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
 const EXECUTION_AGENTS = AGENTS.filter((a) => a.id !== "planner");
 
 export function CommandConsole({
   defaultProjectId,
+  onRunStarted,
 }: {
   defaultProjectId?: string;
+  onRunStarted?: (run: WorkflowRun) => void;
 }) {
   const { push } = useToast();
   const projects = useProjects();
@@ -31,6 +36,7 @@ export function CommandConsole({
   const [command, setCommand] = useState("");
   const [planFile, setPlanFile] = useState<File | null>(null);
   const [planUploaded, setPlanUploaded] = useState(false);
+  const [liveRunId, setLiveRunId] = useState<string | null>(null);
 
   const upload = useUploadPlan(planMode === "upload" ? projectId : null);
 
@@ -69,6 +75,7 @@ export function CommandConsole({
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     if (runCount === 0) return;
+    setLiveRunId(null);
     run.mutate(
       {
         project_id: projectId || undefined,
@@ -78,7 +85,9 @@ export function CommandConsole({
         plan_source: planMode,
       },
       {
-        onSuccess: () => {
+        onSuccess: (res) => {
+          setLiveRunId(res?.id ?? null);
+          onRunStarted?.(res);
           push(
             `Run started — ${effectiveAgents.join(", ")}.`,
             "success",
@@ -100,21 +109,30 @@ export function CommandConsole({
       ? true
       : !!projectId && planUploaded && selected.length >= 1;
 
+  const pipelineLabel = effectiveAgents.map((id) => {
+    const agent = AGENTS.find((a) => a.id === id);
+    return agent?.label ?? id;
+  });
+
   return (
     <Card className="overflow-hidden">
+      <span
+        aria-hidden
+        className="block h-px w-full bg-gradient-to-r from-primary/60 to-transparent"
+      />
       <div className="relative overflow-hidden border-b border-edge-soft">
         <div className="bg-grid pointer-events-none absolute inset-0 opacity-40" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
-        <div className="relative flex items-center justify-between gap-3 px-5 py-3.5">
+        <div className="relative flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-primary/40 bg-primary-soft">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/40 bg-primary-soft">
               <Terminal className="h-4 w-4 text-primary" />
             </span>
             <div>
               <p className="font-display text-[15px] font-semibold tracking-tight text-text">
                 Dispatch desk
               </p>
-              <p className="font-mono text-[9px] font-medium uppercase tracking-[0.2em] text-faint">
+              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-muted">
                 Work order · run {runCount} agent{runCount === 1 ? "" : "s"}
               </p>
             </div>
@@ -136,8 +154,8 @@ export function CommandConsole({
                 className={cn(
                   "relative rounded-md border px-4 py-3 text-left transition-colors duration-150",
                   planMode === "agent"
-                    ? "border-primary/60"
-                    : "border-edge bg-surface-2/70 hover:border-edge",
+                    ? "border-primary/60 bg-primary-soft/40"
+                    : "border-edge bg-surface-2/70 hover:border-primary/30",
                 )}
               >
                 {planMode === "agent" && (
@@ -146,6 +164,11 @@ export function CommandConsole({
                     className="absolute inset-0 rounded-md bg-primary-soft"
                     transition={{ type: "spring", stiffness: 500, damping: 38 }}
                   />
+                )}
+                {planMode === "agent" && (
+                  <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-ink">
+                    <Check className="h-3 w-3" />
+                  </span>
                 )}
                 <div className="relative z-10 flex items-center gap-2">
                   <Sparkles
@@ -158,7 +181,7 @@ export function CommandConsole({
                     Planner writes the plan
                   </p>
                 </div>
-                <p className="relative z-10 mt-1.5 text-[11px] leading-5 text-muted">
+                <p className="relative z-10 mt-1.5 text-[11px] leading-5 text-text-dim">
                   The Planner researches your idea on the web and writes
                   docs/implementation_plan.md first.
                 </p>
@@ -171,8 +194,8 @@ export function CommandConsole({
                 className={cn(
                   "relative rounded-md border px-4 py-3 text-left transition-colors duration-150",
                   planMode === "upload"
-                    ? "border-primary/60"
-                    : "border-edge bg-surface-2/70 hover:border-edge",
+                    ? "border-primary/60 bg-primary-soft/40"
+                    : "border-edge bg-surface-2/70 hover:border-primary/30",
                 )}
               >
                 {planMode === "upload" && (
@@ -181,6 +204,11 @@ export function CommandConsole({
                     className="absolute inset-0 rounded-md bg-primary-soft"
                     transition={{ type: "spring", stiffness: 500, damping: 38 }}
                   />
+                )}
+                {planMode === "upload" && (
+                  <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-ink">
+                    <Check className="h-3 w-3" />
+                  </span>
                 )}
                 <div className="relative z-10 flex items-center gap-2">
                   <FileUp
@@ -193,7 +221,7 @@ export function CommandConsole({
                     I&apos;ll bring a plan
                   </p>
                 </div>
-                <p className="relative z-10 mt-1.5 text-[11px] leading-5 text-muted">
+                <p className="relative z-10 mt-1.5 text-[11px] leading-5 text-text-dim">
                   Upload a markdown plan — the engineers build directly from it
                   and the Planner is skipped.
                 </p>
@@ -203,31 +231,31 @@ export function CommandConsole({
 
           {planMode === "upload" && (
             <div className="rounded-md border border-edge bg-surface-2/70 px-4 py-3">
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="min-w-0 flex-1">
-                  <Field label="Plan file (.md / .txt)">
-                    <Input
-                      type="file"
+              <Field label="Plan file (.md / .txt)">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <FileDropzone
                       accept=".md,.markdown,.txt"
-                      onChange={(e) => {
-                        setPlanFile(e.target.files?.[0] ?? null);
+                      value={planFile}
+                      disabled={!projectId}
+                      onChange={(file) => {
+                        setPlanFile(file);
                         setPlanUploaded(false);
                       }}
-                      disabled={!projectId}
                     />
-                  </Field>
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={submitPlan}
+                    loading={upload.isPending}
+                    disabled={!planFile || !projectId}
+                  >
+                    <FileUp className="h-3.5 w-3.5" /> Upload plan
+                  </Button>
                 </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={submitPlan}
-                  loading={upload.isPending}
-                  disabled={!planFile || !projectId}
-                >
-                  <FileUp className="h-3.5 w-3.5" /> Upload plan
-                </Button>
-              </div>
-              <p className="mt-2 text-[11px] text-muted">
+              </Field>
+              <p className="mt-2 text-[11px] font-medium text-text-dim">
                 {!projectId
                   ? "Select a project first — the plan is saved to its docs/implementation_plan.md."
                   : planUploaded
@@ -259,7 +287,7 @@ export function CommandConsole({
                       1
                     </span>
                     Planner
-                    <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-faint">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted">
                       planner
                     </span>
                   </motion.span>
@@ -280,26 +308,46 @@ export function CommandConsole({
                       "flex items-center gap-2 rounded-md border px-3 py-2 text-left font-display text-xs font-medium tracking-tight transition-colors duration-150",
                       active
                         ? "border-primary/50 bg-primary-soft text-primary"
-                        : "border-edge bg-surface-2/70 text-text-dim hover:border-edge hover:text-text",
+                        : "border-edge bg-surface-2/70 text-text-dim hover:border-primary/30 hover:text-text",
                     )}
                   >
                     {active ? (
-                  <span className="flex h-5 w-5 items-center justify-center rounded-[3px] bg-primary font-mono text-[10px] font-semibold text-primary-ink">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-[3px] bg-primary font-mono text-[10px] font-semibold text-primary-ink">
                         {index + 1}
                       </span>
                     ) : (
-                      <span className="flex h-5 w-5 items-center justify-center rounded-[3px] border border-edge bg-surface font-mono text-[10px] text-faint">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-[3px] border border-edge bg-surface font-mono text-[10px] text-muted">
                         {index + 1}
                       </span>
                     )}
                     {agent.label}
-                    <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-faint">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted">
                       {agent.id}
                     </span>
                   </motion.button>
                 );
               })}
             </div>
+
+            {runCount > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-edge bg-surface-2/70 px-3 py-2">
+                <span className="font-mono text-[9px] font-medium uppercase tracking-[0.14em] text-muted">
+                  Pipeline
+                </span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {pipelineLabel.map((label, i) => (
+                    <Fragment key={`${label}-${i}`}>
+                      {i > 0 && (
+                        <ArrowRight className="h-3 w-3 shrink-0 text-muted" />
+                      )}
+                      <span className="rounded-[3px] border border-edge bg-surface px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-text-dim">
+                        {label}
+                      </span>
+                    </Fragment>
+                  ))}
+                </div>
+              </div>
+            )}
           </Field>
 
           <Field label="The brief">
@@ -367,6 +415,23 @@ export function CommandConsole({
             </p>
           )}
         </form>
+
+        <AnimatePresence initial={false}>
+          {liveRunId && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+            >
+              <ActivityPanel
+                runId={liveRunId}
+                title="Live crew feed"
+                compact
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </CardBody>
     </Card>
   );

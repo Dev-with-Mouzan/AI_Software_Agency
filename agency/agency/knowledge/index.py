@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agency.db.models import KnowledgeChunk
-from agency.knowledge.vector import PGGVectorStore, rank_records
+from agency.knowledge.vector import rank_records
 from agency.llm.adapters import get_embedding
 
 DEFAULT_INCLUDE_EXTS = {
@@ -49,11 +49,8 @@ CHUNK_OVERLAP = 150
 class KnowledgeBase:
     """Chunking + retrieval over the project corpus."""
 
-    def __init__(
-        self, project_root: Path | None = None, vector_store: PGGVectorStore | None = None
-    ) -> None:
+    def __init__(self, project_root: Path | None = None) -> None:
         self.project_root = project_root
-        self._pg_store = vector_store
 
     # --- indexing -------------------------------------------------------
     async def index_project(self, session: AsyncSession, project_id: UUID, root: Path) -> int:
@@ -80,10 +77,6 @@ class KnowledgeBase:
                         embedding=embedding,
                     )
                 )
-                if self._pg_store and embedding:
-                    await self._pg_store.upsert(
-                        f"{project_id}:{rel}:{i}", chunk, embedding, {"path": rel}
-                    )
 
         if chunks:
             session.add_all(chunks)
@@ -126,18 +119,6 @@ class KnowledgeBase:
             query_embedding = await get_embedding(query)
         except Exception:
             query_embedding = None
-
-        if self._pg_store and query_embedding:
-            results = await self._pg_store.search(query_embedding, k)
-            return [
-                {
-                    "title": r["metadata"].get("path", r["content"][:60]),
-                    "content": r["content"],
-                    "score": round(score, 3),
-                    "source": "vector",
-                }
-                for score, r in results
-            ]
 
         stmt = select(KnowledgeChunk)
         if project_id is not None:

@@ -60,7 +60,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ push }}>
       {children}
-      <div className="pointer-events-none fixed bottom-5 right-5 z-50 flex w-80 flex-col gap-2">
+      <div className="pointer-events-none fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-50 flex flex-col gap-2 sm:inset-x-auto sm:bottom-5 sm:right-5 sm:w-80">
         <AnimatePresence initial={false}>
           {toasts.map((toast) => {
             const style = toneStyles[toast.tone];

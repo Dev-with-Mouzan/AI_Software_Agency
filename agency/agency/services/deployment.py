@@ -19,11 +19,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agency.config import get_settings
 from agency.core.enums import DeploymentStatus, TaskStatus
 from agency.db.models import Deployment, Project, Task
+from agency.deployments import DeploymentError, ProviderContext, get_provider, profile_for
 from agency.permissions.audit import record as audit_record
 from agency.schemas.deployment import DeploymentCheckResult
 
 REQUIRED_SECRET_KEYS = ["DATABASE_URL", "REDIS_URL"]
 CHECK_TIMEOUT = 120
+
+
+class ProviderNotConfigured(ValueError):
+    """Raised when a deployment is requested but no provider credentials exist."""
 
 
 class DeploymentService:
@@ -181,8 +186,195 @@ class DeploymentService:
             )
         ).first()
 
+    # --- provider deployments (AWS / Vercel) ----------------------------
+    @staticmethod
+    async def options(session: AsyncSession, project: Project) -> dict[str, Any]:
+        from agency.deployments import provider_options
+
+        profile = profile_for(Path(project.root_dir))
+        return {
+            "project_type": profile.description,
+            "technology_stack": profile.tech_stack,
+            "providers": provider_options(profile),
+        }
+
+    @staticmethod
+    async def launch(
+        session: AsyncSession,
+        project: Project,
+        *,
+        provider: str,
+        environment: str = "production",
+    ) -> tuple[Deployment, Any]:
+        """Create a provider deployment + its orchestrator run (started in background)."""
+        from agency.workflows.orchestrator import workflow_orchestrator
+
+        deployment = Deployment(
+            project_id=project.id,
+            environment=environment,
+            version="0.0.0",
+            provider=provider,
+            status=DeploymentStatus.DEPLOYING.value,
+        )
+        session.add(deployment)
+        await session.flush()
+        run = await workflow_orchestrator.prepare_deploy(
+            session,
+            project=project,
+            deployment=deployment,
+            provider=provider,
+            environment=environment,
+            actor="human",
+        )
+        await session.refresh(deployment)
+        return deployment, run
+
+    @staticmethod
+    async def redeploy(session: AsyncSession, project: Project) -> tuple[Deployment, Any]:
+        latest = await DeploymentService.status(session, project.id)
+        if latest is None or not latest.provider:
+            raise ValueError("no provider deployment exists to redeploy")
+        return await DeploymentService.launch(
+            session,
+            project,
+            provider=latest.provider,
+            environment=latest.environment or "production",
+        )
+
+    @staticmethod
+    async def remove(
+        session: AsyncSession,
+        project: Project,
+        *,
+        deployment: Deployment | None = None,
+        actor: str = "human",
+    ) -> Deployment:
+        deployment = deployment or await DeploymentService.status(session, project.id)
+        if deployment is None:
+            raise ValueError("no deployment to remove")
+        if not deployment.removed and deployment.provider:
+            provider = get_provider(deployment.provider)
+            if provider is not None:
+                profile = profile_for(Path(project.root_dir))
+                ctx = ProviderContext(
+                    project=project,
+                    root=Path(project.root_dir),
+                    environment=deployment.environment,
+                    deployment_id=deployment.deployment_id,
+                    extra={
+                        "frontend_dir": profile.frontend_dir,
+                        "static_dir": profile.static_dir,
+                        "deployment_id": deployment.deployment_id,
+                    },
+                )
+                log = _deployment_logger(deployment)
+                try:
+                    await provider.remove(ctx, log)
+                except DeploymentError as exc:
+                    raise ValueError(f"could not tear down the deployment: {exc}") from exc
+            deployment.removed = True
+            deployment.status = DeploymentStatus.REMOVED.value
+            deployment.error = ""
+        await audit_record(
+            session,
+            actor=actor,
+            action="delete",
+            resource_type="deployment",
+            resource_id=str(deployment.id),
+            detail={"provider": deployment.provider, "removed": deployment.removed},
+        )
+        await session.commit()
+        return deployment
+
+    @staticmethod
+    async def logs(session: AsyncSession, project: Project) -> dict[str, Any]:
+        deployment = await DeploymentService.status(session, project.id)
+        if deployment is None:
+            return {"deployment_id": None, "status": "", "logs": []}
+        return {
+            "deployment_id": str(deployment.id),
+            "status": deployment.status,
+            "logs": deployment.logs or [],
+        }
+
+    @staticmethod
+    async def add_domain(
+        session: AsyncSession, project: Project, domain: str
+    ) -> dict[str, Any]:
+        deployment = await DeploymentService.status(session, project.id)
+        if deployment is None or not deployment.provider:
+            raise ValueError("deploy the project before attaching a custom domain")
+        provider = get_provider(deployment.provider)
+        if provider is None:
+            raise ValueError(f"unknown provider: {deployment.provider}")
+        if not provider.is_configured():
+            raise ProviderNotConfigured("Deployment provider is not configured.")
+        ctx = _provider_context(deployment, project)
+        log = _deployment_logger(deployment)
+        result = await provider.add_domain(ctx, log, domain)
+        deployment.custom_domain = domain
+        deployment.domain_status = result.get("status", "pending_dns")
+        deployment.dns_records = result.get("dns_records") or {}
+        await audit_record(
+            session,
+            actor="human",
+            action="create",
+            resource_type="domain",
+            resource_id=str(deployment.id),
+            detail={"domain": domain, "status": deployment.domain_status},
+        )
+        await session.commit()
+        return result
+
+    @staticmethod
+    async def check_domain(session: AsyncSession, project: Project) -> dict[str, Any]:
+        deployment = await DeploymentService.status(session, project.id)
+        if deployment is None:
+            raise ValueError("no deployment exists for this project")
+        if not deployment.custom_domain:
+            raise ValueError("no custom domain configured — add one first")
+        provider = get_provider(deployment.provider)
+        if provider is None or not provider.is_configured():
+            raise ProviderNotConfigured("Deployment provider is not configured.")
+        ctx = _provider_context(deployment, project)
+        log = _deployment_logger(deployment)
+        result = await provider.check_domain(ctx, log, deployment.custom_domain)
+        deployment.domain_status = result.get("status", deployment.domain_status)
+        await session.commit()
+        return result
+
 
 deployment_service = DeploymentService()
+
+
+def _provider_context(deployment: Deployment, project: Project) -> ProviderContext:
+    profile = profile_for(Path(project.root_dir))
+    return ProviderContext(
+        project=project,
+        root=Path(project.root_dir),
+        environment=deployment.environment or "production",
+        deployment_id=deployment.deployment_id,
+        extra={
+            "frontend_dir": profile.frontend_dir,
+            "static_dir": profile.static_dir,
+            "deployment_id": deployment.deployment_id,
+        },
+    )
+
+
+def _deployment_logger(deployment: Deployment):
+    def log(message: str, level: str = "info", detail: str = "") -> None:
+        deployment.logs = [
+            *deployment.logs,
+            {
+                "ts": datetime.now(UTC).isoformat(),
+                "level": level,
+                "message": message,
+                "detail": detail,
+            },
+        ]
+
+    return log
 
 
 # --- individual checks ----------------------------------------------------

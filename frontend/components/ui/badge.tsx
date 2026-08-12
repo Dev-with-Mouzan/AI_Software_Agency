@@ -60,7 +60,7 @@ export function Badge({
   );
 }
 
-export function statusTone(status: string): BadgeTone {
+function statusTone(status: string): BadgeTone {
   const s = status.toUpperCase();
   if (["OK", "ACTIVE", "ONLINE", "DONE", "COMPLETED", "SUCCESS", "PASSED", "READY"].includes(s))
     return "success";

@@ -1,30 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
-import { FolderKanban, ArrowLeft } from "lucide-react";
+import { FolderKanban, ArrowLeft, Rocket } from "lucide-react";
 
 import { StatusBadge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/skeleton";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
-import { TaskBoard } from "@/components/projects/task-board";
-import { ProjectOverview } from "@/components/projects/project-overview";
 import { DeploymentsTab } from "@/components/projects/deployments-tab";
+import { FilesBrowser } from "@/components/projects/files-browser";
 import { CommandConsole } from "@/components/workflows/command-console";
-import { useProjectDetail, useWorkflowRuns } from "@/lib/hooks";
+import { DeployModal } from "@/components/projects/deploy/deploy-modal";
+import { DeployProgressModal } from "@/components/projects/deploy/deploy-progress-modal";
+import { useProjectDetail } from "@/lib/hooks";
 import { formatDate, shortId } from "@/lib/format";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-export default function ProjectPage() {
+function ProjectContent() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const projectId = params.id;
   const detail = useProjectDetail(projectId);
-  const runs = useWorkflowRuns(projectId);
-  const [tab, setTab] = useState("overview");
+
+  const initialTab = searchParams.get("tab") === "deployments" ? "deployments" : "command";
+  const [tab, setTab] = useState(initialTab);
+  const [deployOpen, setDeployOpen] = useState(false);
+  const [progressOpen, setProgressOpen] = useState(false);
 
   if (detail.isLoading || !detail.data) {
     return <PageLoader label="Loading project…" />;
@@ -65,9 +71,14 @@ export default function ProjectPage() {
               {project.root_dir}
             </p>
           </div>
-          <div className="text-right text-[11px] text-faint">
-            <p>Created {formatDate(project.created_at)}</p>
-            <p>Updated {formatDate(project.updated_at)}</p>
+          <div className="flex items-center gap-3">
+            <div className="text-right text-[11px] text-faint">
+              <p>Created {formatDate(project.created_at)}</p>
+              <p>Updated {formatDate(project.updated_at)}</p>
+            </div>
+            <Button onClick={() => setDeployOpen(true)}>
+              <Rocket className="h-4 w-4" /> Deploy
+            </Button>
           </div>
         </CardBody>
       </Card>
@@ -81,27 +92,50 @@ export default function ProjectPage() {
 
       <Tabs
         tabs={[
-          { id: "overview", label: "Overview" },
           { id: "command", label: "Command" },
-          { id: "board", label: "Board" },
+          { id: "files", label: "Files" },
           { id: "deployments", label: "Deployments" },
         ]}
         active={tab}
         onChange={setTab}
       >
-        <TabPanel active={tab} id="overview">
-          <ProjectOverview project={project} runs={runs.data} />
-        </TabPanel>
         <TabPanel active={tab} id="command">
           <CommandConsole defaultProjectId={projectId} />
         </TabPanel>
-        <TabPanel active={tab} id="board">
-          <TaskBoard projectId={projectId} />
+        <TabPanel active={tab} id="files">
+          <FilesBrowser slug={project.slug} projectId={projectId} />
         </TabPanel>
         <TabPanel active={tab} id="deployments">
           <DeploymentsTab projectId={projectId} />
         </TabPanel>
       </Tabs>
+
+      <DeployModal
+        projectId={projectId}
+        open={deployOpen}
+        onClose={() => setDeployOpen(false)}
+        onLaunched={() => {
+          setDeployOpen(false);
+          setProgressOpen(true);
+        }}
+      />
+      <DeployProgressModal
+        projectId={projectId}
+        open={progressOpen}
+        onClose={() => setProgressOpen(false)}
+        onOpenDetails={() => {
+          setProgressOpen(false);
+          setTab("deployments");
+        }}
+      />
     </div>
+  );
+}
+
+export default function ProjectPage() {
+  return (
+    <Suspense fallback={<PageLoader label="Loading project…" />}>
+      <ProjectContent />
+    </Suspense>
   );
 }

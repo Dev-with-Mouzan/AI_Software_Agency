@@ -52,9 +52,6 @@ DEFAULT_BASE_URLS = {
     "qwen": "https://dashscope.aliyuncs.com/compatible-mode/v1",
 }
 
-# OpenAI-compatible providers routed through langchain-openai.
-OPENAI_COMPATIBLE = ("openai", "deepseek", "qwen")
-
 
 class RuntimeSettings:
     """In-memory mirror of the persisted SettingsRecord."""
@@ -131,7 +128,12 @@ def any_provider_configured() -> bool:
         if has_provider(p):
             return True
     s = get_settings()
-    return bool(s.anthropic_api_key or s.ollama_base_url)
+    # Anthropic is env-only; Ollama is keyless but must be *explicitly* selected
+    # (its base URL has a non-empty default, so it can never count on its own).
+    if s.anthropic_api_key or s.llm_provider == "ollama":
+        return True
+    # Ollama can also be routed per-agent through AGENT_MODELS without a key.
+    return any(c.provider == "ollama" for c in s.agent_models.values())
 
 
 def runtime_default_provider() -> str:
@@ -297,11 +299,11 @@ async def get_settings_out(session: AsyncSession) -> SettingsOut:
         AgentModelOut(
             kind=kind,
             name=_agent_name(kind),
-            provider=route[0],
-            model=route[1],
+            provider=(route[0] if route else ""),
+            model=(route[1] if route else ""),
         )
         for kind in AGENT_CLASSES
-        for route in [effective_agent_route(kind)]
+        for route in [runtime_agent_assignment(kind)]
     ]
     return SettingsOut(
         configured=any_provider_configured(),
