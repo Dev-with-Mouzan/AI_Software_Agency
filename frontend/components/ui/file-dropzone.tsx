@@ -63,7 +63,7 @@ export function FileDropzone({ accept, disabled, value, onChange }: FileDropzone
       }}
       onDrop={onDrop}
       className={cn(
-        "group relative flex w-full cursor-pointer select-none items-center justify-between gap-3 rounded-lg border-2 border-dashed px-4 py-4",
+        "group relative flex w-full cursor-pointer select-none flex-col sm:flex-row items-center sm:justify-between gap-4 sm:gap-3 rounded-lg border-2 border-dashed px-4 py-5 sm:py-4 text-center sm:text-left",
         "transition-colors duration-150",
         "focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20",
         dragging
@@ -83,7 +83,7 @@ export function FileDropzone({ accept, disabled, value, onChange }: FileDropzone
         aria-label="Choose implementation plan"
         onChange={(event: ChangeEvent<HTMLInputElement>) => handleFiles(event.target.files)}
       />
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 flex-col sm:flex-row items-center gap-3">
         <span
           className={cn(
             "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition-colors duration-150",

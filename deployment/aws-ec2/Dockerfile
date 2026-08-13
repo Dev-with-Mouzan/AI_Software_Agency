@@ -40,4 +40,4 @@ WORKDIR /app/agency
 EXPOSE 8000
 
 # Migrations run with the sync driver (psycopg), then the API serves with asyncpg.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn agency.api.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic -c agency/alembic.ini upgrade head && uvicorn agency.api.main:app --host 0.0.0.0 --port 8000"]
