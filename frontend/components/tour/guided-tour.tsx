@@ -54,14 +54,22 @@ function computeTip(
 ): { left: number; top: number; placement: "top" | "bottom" } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+  const fitsBottom = rect.bottom + h + MARGIN <= vh - MARGIN;
+  const fitsTop = rect.top - h - MARGIN >= MARGIN;
   let placement: "top" | "bottom" = preferred;
-  if (placement === "bottom" && rect.bottom + h + MARGIN > vh - MARGIN && rect.top - h - MARGIN > MARGIN) {
+  if (placement === "bottom" && !fitsBottom && fitsTop) {
     placement = "top";
-  } else if (placement === "top" && rect.top - h - MARGIN < MARGIN && rect.bottom + h + MARGIN < vh - MARGIN) {
+  } else if (placement === "top" && !fitsTop && fitsBottom) {
     placement = "bottom";
   }
-  const top = placement === "bottom" ? rect.bottom + MARGIN : rect.top - h - MARGIN;
-  const left = Math.min(Math.max(rect.left + rect.width / 2 - w / 2, MARGIN), vw - w - MARGIN);
+  const topBase =
+    placement === "bottom" ? rect.bottom + MARGIN : rect.top - h - MARGIN;
+  const top = Math.min(Math.max(topBase, MARGIN), Math.max(MARGIN, vh - h - MARGIN));
+  const leftBase = rect.left + rect.width / 2 - w / 2;
+  const left = Math.min(
+    Math.max(leftBase, MARGIN),
+    Math.max(MARGIN, vw - w - MARGIN),
+  );
   return { left, top, placement };
 }
 
@@ -145,6 +153,7 @@ export function GuidedTour() {
     if (!tour) return;
     const step = tour.steps[index];
     let cancelled = false;
+    let settle: number | undefined;
     (async () => {
       const el = await waitForElement(step.selector);
       if (cancelled) return;
@@ -154,10 +163,16 @@ export function GuidedTour() {
       }
       setMissing(false);
       el.scrollIntoView({ block: "center", behavior: "smooth" });
-      setRect(el.getBoundingClientRect());
+      const measure = () => {
+        if (cancelled) return;
+        setRect(el.getBoundingClientRect());
+      };
+      measure();
+      settle = window.setTimeout(measure, 550);
     })();
     return () => {
       cancelled = true;
+      if (settle !== undefined) window.clearTimeout(settle);
     };
   }, [tour, index]);
 
