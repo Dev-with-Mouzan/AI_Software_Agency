@@ -116,7 +116,7 @@ export default function ChatPage() {
               </p>
             </div>
           </div>
-          <div className="ml-auto w-full sm:w-56">
+          <div className="ml-auto w-full sm:w-56" data-tour="chat-scope">
             <Select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
@@ -226,12 +226,14 @@ export default function ChatPage() {
         >
           <div className="flex gap-2">
             <Input
+              data-tour="chat-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask something… e.g. Plan the customer portal, or add auth to the API"
               className="flex-1"
             />
             <Button
+              data-tour="chat-send"
               type="submit"
               loading={chat.isPending}
               disabled={!input.trim()}

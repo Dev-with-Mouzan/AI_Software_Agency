@@ -38,10 +38,10 @@ export function Tabs({
               aria-selected={selected}
               onClick={() => onChange(tab.id)}
               className={cn(
-                "relative flex items-center gap-2 px-4 py-2.5 font-display text-[13px] font-medium tracking-tight transition-colors duration-150",
+                "relative flex min-h-11 flex-1 shrink items-center justify-center gap-2 px-1 py-2.5 font-display text-[13px] font-medium tracking-tight transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:min-h-0 sm:flex-initial sm:justify-start sm:px-4",
                 selected
                   ? "text-primary"
-                  : "text-muted hover:text-text-dim",
+                  : "text-muted hover:text-text-dim active:text-text",
               )}
             >
               {selected && (

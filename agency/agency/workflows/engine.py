@@ -298,6 +298,11 @@ class WorkflowEngine:
 
     # --- dispatch -------------------------------------------------------
     async def _dispatch(self, session: AsyncSession, run: WorkflowRun, step: WorkflowStep) -> None:
+        # Re-check before every step: if the API key was cleared mid-run, the
+        # step must fail loudly instead of executing against a null provider.
+        from agency.services import settings as settings_service
+
+        settings_service.ensure_api_configured()
         if step.handler == "agent_run":
             await self._step_agent_run(session, run, step)
         else:

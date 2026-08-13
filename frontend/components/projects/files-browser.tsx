@@ -323,7 +323,7 @@ export function FilesBrowser({ slug, projectId }: { slug: string; projectId: str
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex-wrap gap-y-2">
         <div className="flex items-center gap-2">
           <CardTitle>Files</CardTitle>
           {!rootLoading && !rootError && (
@@ -332,21 +332,23 @@ export function FilesBrowser({ slug, projectId }: { slug: string; projectId: str
             </Badge>
           )}
         </div>
-        <Button
-          size="sm"
-          variant="secondary"
-          loading={busy}
-          onClick={downloadArchive}
-        >
-          <Archive className="h-3.5 w-3.5" /> Download .zip
-        </Button>
-        <Button
-          size="sm"
-          variant="danger"
-          onClick={() => setDeleteOpen(true)}
-        >
-          <Trash2 className="h-3.5 w-3.5" /> Delete project
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={busy}
+            onClick={downloadArchive}
+          >
+            <Archive className="h-3.5 w-3.5" /> Download .zip
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete project
+          </Button>
+        </div>
       </CardHeader>
       <CardBody className="p-0">
         <div className="grid gap-px lg:grid-cols-[minmax(0,300px)_1fr]">
@@ -403,10 +405,10 @@ export function FilesBrowser({ slug, projectId }: { slug: string; projectId: str
                 className="flex min-h-0 flex-1 flex-col"
               >
                 <div className="flex flex-wrap items-center gap-2 border-b border-edge-soft px-4 py-2.5">
-                  <span className="font-mono text-xs text-text-dim">
+                  <span className="min-w-0 truncate font-mono text-xs text-text-dim">
                     {file.path}
                   </span>
-                  <span className="ml-auto flex items-center gap-2">
+                  <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
                     {file.binary && <Badge tone="warning">binary</Badge>}
                     {file.truncated && <Badge tone="info">truncated</Badge>}
                     {file.redacted && <Badge tone="danger">protected</Badge>}

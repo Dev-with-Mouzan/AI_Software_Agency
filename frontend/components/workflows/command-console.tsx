@@ -11,8 +11,9 @@ import { FileDropzone } from "@/components/ui/file-dropzone";
 import { Field, Select, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { ActivityPanel } from "@/components/workflows/activity-panel";
-import { AGENTS, DEPLOY_PLATFORMS, ApiClientError } from "@/lib/api";
-import { useAgentRun, useProjects, useUploadPlan } from "@/lib/hooks";
+import { AGENTS, DEPLOY_PLATFORMS, ApiClientError, isProviderNotConfigured } from "@/lib/api";
+import { useAgentRun, useLlmSettings, useProjects, useUploadPlan } from "@/lib/hooks";
+import { PROVIDER_HINT } from "@/lib/chat";
 import type { WorkflowRun } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
@@ -28,6 +29,13 @@ export function CommandConsole({
   const { push } = useToast();
   const projects = useProjects();
   const run = useAgentRun();
+  const llmSettings = useLlmSettings();
+
+  // The backend is the source of truth; this only disables the button when the
+  // settings endpoint confirms no provider is configured.
+  const providerReady = llmSettings.isSuccess
+    ? llmSettings.data?.configured === true
+    : true;
 
   const [planMode, setPlanMode] = useState<"agent" | "upload">("agent");
   const [selected, setSelected] = useState<string[]>([]);
@@ -94,8 +102,9 @@ export function CommandConsole({
           );
         },
         onError: (error) => {
-          const message =
-            error instanceof ApiClientError
+          const message = isProviderNotConfigured(error)
+            ? PROVIDER_HINT
+            : error instanceof ApiClientError
               ? error.detail
               : "Failed to start the run.";
           push(message, "error");
@@ -123,7 +132,7 @@ export function CommandConsole({
       <div className="relative overflow-hidden border-b border-edge-soft">
         <div className="bg-grid pointer-events-none absolute inset-0 opacity-40" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
-        <div className="relative flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
+        <div className="relative flex items-center justify-between gap-3 px-4 py-3.5 sm:px-5" data-tour="dispatch-desk">
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/40 bg-primary-soft">
               <Terminal className="h-4 w-4 text-primary" />
@@ -296,7 +305,7 @@ export function CommandConsole({
                 : "Your selected agents run in order, following the uploaded plan."
             }
           >
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2" data-tour="crew-sequence">
               <AnimatePresence initial={false}>
                 {planMode === "agent" && (
                   <motion.span
@@ -414,12 +423,29 @@ export function CommandConsole({
             </Field>
           </div>
 
+          {!providerReady && (
+            <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2.5 text-[11px] leading-5 text-warning">
+              <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+              <p>
+                {PROVIDER_HINT}{" "}
+                <a
+                  href="/settings"
+                  className="font-semibold underline underline-offset-2"
+                >
+                  Open Settings
+                </a>{" "}
+                to connect one before dispatching agents.
+              </p>
+            </div>
+          )}
+
           <div className="flex justify-center">
             <Button
+              data-tour="dispatch-button"
               type="submit"
               form="command-console"
               size="lg"
-              disabled={!canRun || runCount === 0}
+              disabled={!canRun || runCount === 0 || !providerReady}
               loading={run.isPending}
               className="font-display uppercase tracking-[0.14em]"
             >

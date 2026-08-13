@@ -1,11 +1,24 @@
-const PROVIDER_HINT =
-  "Your AI provider isn't configured yet. Please configure the AI model to continue.";
+export const AI_PROVIDER_NOT_CONFIGURED_CODE = "AI_PROVIDER_NOT_CONFIGURED";
+
+export const PROVIDER_HINT =
+  "AI provider not configured. Add your API key in Settings to run agents.";
 
 const GENERAL_ERROR =
   "Something went wrong while I was working. Please try again in a moment.";
 
 const NOT_CONFIGURED =
-  /llm_provider|provider mode|offline\s*\(\s*null\s*\)|\bnull provider\b|provider.*(?:is )?not configured|not configured.*provider|no (?:ai )?provider|add an api key|connect an api key/i;
+  /AI_PROVIDER_NOT_CONFIGURED|llm_provider|provider mode|offline\s*\(\s*null\s*\)|\bnull provider\b|provider.*(?:is )?not configured|not configured.*provider|no (?:ai )?provider|add an api key|connect an api key/i;
+
+export function isProviderNotConfiguredError(
+  error: unknown,
+): boolean {
+  return (
+    (typeof error === "object" &&
+      error !== null &&
+      (error as { code?: string }).code === AI_PROVIDER_NOT_CONFIGURED_CODE) ||
+    NOT_CONFIGURED.test(String((error as { detail?: string })?.detail ?? (error as Error)?.message ?? ""))
+  );
+}
 
 const INTERNAL_ERROR =
   /error during execution|stopped after repeated tool failures|cannot run because the (?:llm )?provider|cannot run because the llm|traceback \(most recent call last\)/i;

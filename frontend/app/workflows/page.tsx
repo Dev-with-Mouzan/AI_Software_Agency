@@ -146,7 +146,7 @@ export default function WorkflowsPage() {
               aria-hidden
               className="block h-px w-full bg-gradient-to-r from-primary/60 to-transparent"
             />
-            <CardHeader className="flex-row items-center justify-between">
+            <CardHeader className="flex-row items-center justify-between" data-tour="ledger">
               <div>
                 <CardTitle>The ledger</CardTitle>
                 <p className="mt-0.5 text-xs font-medium text-text-dim">

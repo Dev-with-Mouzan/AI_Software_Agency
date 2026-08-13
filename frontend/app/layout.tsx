@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SiteNavbar } from "@/components/layout/site-navbar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { GlobalChatbot } from "@/components/global-chatbot";
+import { GuidedTour } from "@/components/tour/guided-tour";
 import { ToastProvider } from "@/components/ui/toast";
 import { AppMain } from "@/components/motion/app-main";
 
@@ -38,6 +39,7 @@ export default function RootLayout({
               <AppMain>{children}</AppMain>
               <SiteFooter />
               <GlobalChatbot />
+              <GuidedTour />
             </ToastProvider>
           </ThemeProvider>
         </Providers>

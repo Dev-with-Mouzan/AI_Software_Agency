@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Check,
   CheckCircle2,
@@ -8,6 +9,7 @@ import {
   EyeOff,
   KeyRound,
   Loader2,
+  Map,
   PlugZap,
   RotateCcw,
   ShieldAlert,
@@ -22,6 +24,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
 import { useLlmSettings, useUpdateLlmSettings, useTestProvider } from "@/lib/hooks";
+import { TOURS, resetTour } from "@/lib/tours";
 import type { AgentModelInput, ProviderConfigInput } from "@/lib/types";
 
 const PROVIDERS = [
@@ -72,6 +75,8 @@ const emptyDraft = (): ProviderDraft => ({
 });
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const pathname = usePathname();
   const query = useLlmSettings();
   const toast = useToast();
   const save = useUpdateLlmSettings();
@@ -202,6 +207,14 @@ export default function SettingsPage() {
     }
   };
 
+  const restartTour = (id: string) => {
+    const t = TOURS.find((x) => x.id === id);
+    if (!t) return;
+    resetTour(id);
+    window.dispatchEvent(new CustomEvent("devpilot:tour-restart", { detail: id }));
+    if (pathname !== t.route) router.push(t.route);
+  };
+
   if (query.isLoading) return <PageLoader label="Loading settings…" />;
 
   const configured = query.data?.configured;
@@ -250,7 +263,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Default provider */}
-      <Card>
+      <Card data-tour="settings-provider">
         <CardHeader>
           <div>
             <CardTitle>Default provider</CardTitle>
@@ -435,7 +448,7 @@ export default function SettingsPage() {
       </Card>
 
       {/* Agent routing */}
-      <Card>
+      <Card data-tour="settings-agents">
         <CardHeader>
           <div>
             <CardTitle>Specialist models</CardTitle>
@@ -493,6 +506,50 @@ export default function SettingsPage() {
         </CardBody>
       </Card>
 
+      {/* Guided tours */}
+      <Card data-tour="settings-tours">
+        <CardHeader>
+          <div>
+            <CardTitle>Guided tours</CardTitle>
+            <p className="mt-0.5 text-xs text-muted">
+              Replay a tab&apos;s walkthrough anytime. First visits show it
+              automatically.
+            </p>
+          </div>
+        </CardHeader>
+        <CardBody>
+          <div className="divide-y divide-edge-soft">
+            {TOURS.map((t) => (
+              <div
+                key={t.id}
+                className="flex flex-wrap items-center justify-between gap-2 py-3 first:pt-0 last:pb-0"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-edge bg-surface-2 text-text-dim">
+                    <Map className="h-3.5 w-3.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-display text-sm font-medium text-text">
+                      {t.tab}
+                    </p>
+                    <p className="truncate text-[11px] text-muted">
+                      {t.description}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => restartTour(t.id)}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> Restart
+                </Button>
+              </div>
+            ))}
+          </div>
+        </CardBody>
+      </Card>
+
       {test.isPending && (
         <div className="flex items-center gap-2 text-xs text-muted">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Validating provider…
@@ -503,7 +560,7 @@ export default function SettingsPage() {
         <Button variant="ghost" onClick={resetAll} disabled={!dirty || saving}>
           <RotateCcw className="h-4 w-4" /> Discard
         </Button>
-        <Button onClick={handleSave} loading={saving} disabled={!dirty}>
+        <Button data-tour="settings-save" onClick={handleSave} loading={saving} disabled={!dirty}>
           <Check className="h-4 w-4" /> Save changes
         </Button>
       </div>

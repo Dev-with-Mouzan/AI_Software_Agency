@@ -117,6 +117,11 @@ async def chat(
     agent_kind: str | None = None,
 ) -> ChatResponse:
     registry = get_registry()
+
+    from agency.services import settings as settings_service
+
+    settings_service.ensure_api_configured()
+
     kind = agent_kind or route_message(message)
 
     project = await session.get(Project, project_id) if project_id else None

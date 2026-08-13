@@ -67,7 +67,7 @@ export default function ProjectsPage() {
           title="No projects yet"
           description="Create a project and let DevPilot break it down, build it, and deploy it."
           action={
-            <Button onClick={() => setCreateOpen(true)}>
+            <Button data-tour="new-project" onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4" /> Create your first project
             </Button>
           }
@@ -84,7 +84,7 @@ export default function ProjectsPage() {
                   transition={{ type: "spring", stiffness: 420, damping: 28 }}
                   className="h-full"
                 >
-                <Card lift className="group flex h-full flex-col overflow-hidden transition-colors duration-150 hover:border-primary/40">
+                <Card lift data-tour="project-card" className="group flex h-full flex-col overflow-hidden transition-colors duration-150 hover:border-primary/40">
                   <span
                     aria-hidden
                     className="h-px w-full bg-gradient-to-r from-primary/60 to-transparent transition-opacity duration-150 group-hover:opacity-100"
@@ -121,6 +121,7 @@ export default function ProjectsPage() {
                         <Dropdown
                           trigger={
                             <span
+                              data-tour="project-actions"
                               role="button"
                               tabIndex={0}
                               aria-label={`Actions for ${project.name}`}
@@ -166,7 +167,7 @@ export default function ProjectsPage() {
 
       {projects.data?.length ? (
         <div className="flex items-center justify-end gap-2 border-t border-edge-soft pt-4">
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button data-tour="new-project" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" /> New project
           </Button>
         </div>

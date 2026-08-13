@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.responses import Response
 
@@ -19,6 +20,11 @@ from agency.config import get_settings
 from agency.db.session import get_session_factory, init_db
 from agency.logging.setup import configure_logging
 from agency.observability.metrics import PrometheusMiddleware
+from agency.services.settings import (
+    AIProviderNotConfiguredError,
+    AI_PROVIDER_NOT_CONFIGURED_CODE,
+    AI_PROVIDER_NOT_CONFIGURED_MESSAGE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +83,20 @@ def create_app() -> FastAPI:
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(PrometheusMiddleware)
+
+    @app.exception_handler(AIProviderNotConfiguredError)
+    async def _ai_provider_not_configured(
+        _: Request, exc: AIProviderNotConfiguredError
+    ) -> JSONResponse:
+        """Backend enforcement point: dispatch without a configured AI provider
+        returns 503 + a machine-readable code instead of faking success."""
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": str(exc) or AI_PROVIDER_NOT_CONFIGURED_MESSAGE,
+                "code": AI_PROVIDER_NOT_CONFIGURED_CODE,
+            },
+        )
 
     app.include_router(routes.health.router, prefix="/api", dependencies=[Auth])
     app.include_router(routes.projects.router, prefix="/api", dependencies=[Auth])

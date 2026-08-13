@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -57,11 +56,12 @@ class BaseLLMProvider(ABC):
 
 
 class NullProvider(BaseLLMProvider):
-    """Deterministic offline provider used for tests and demos.
+    """Deterministic offline provider used ONLY by the test environment.
 
-    It does not call an LLM. It echoes instructions back and, when a tool is
-    available, produces a scripted tool call. Enables the full system to run
-    with zero external dependencies.
+    It does not call an LLM and never fabricates work: there are no scripted
+    tool calls, so it cannot create/modify files or report completed actions.
+    It only ever returns a clear "provider not configured" message, which the
+    execution gates refuse to treat as a successful run in real environments.
     """
 
     name = "null"
@@ -79,44 +79,7 @@ class NullProvider(BaseLLMProvider):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
-        _ = temperature, max_tokens
-        last_user = ""
-        for msg in reversed(messages):
-            if msg.get("role") in {"user", "tool"}:
-                last_user = str(msg.get("content", ""))
-                break
-
-        # Scripted behavior: if the user asks to scaffold/run, call the matching tool.
-        scripted: dict[str, str] = {
-            "scaffold": "write_file",
-            "create files": "write_file",
-            "run tests": "run_command",
-            "lint": "run_command",
-            "search": "knowledge_search",
-            "remember": "memory_write",
-        }
-        if tools:
-            for keyword, tool_name in scripted.items():
-                if keyword in last_user.lower() and any(t.name == tool_name for t in tools):
-                    args: dict[str, Any] = {"path": "backend/README.md"}
-                    if tool_name == "knowledge_search":
-                        args = {"query": last_user[:200]}
-                    if tool_name == "memory_write":
-                        args = {"content": last_user[:500]}
-                    if tool_name == "run_command":
-                        args = {"command": "echo offline"}
-                    return LLMResponse(
-                        text="",
-                        tool_calls=[
-                            ToolCall(
-                                id=f"call_{int(time.time())}",
-                                name=tool_name,
-                                arguments=args,
-                            )
-                        ],
-                        finish_reason="tool_calls",
-                    )
-
+        _ = messages, tools, temperature, max_tokens
         reply = (
             "⚠️ No AI provider is configured.\n\n"
             "To get intelligent responses from this agent, please go to **Settings** and "

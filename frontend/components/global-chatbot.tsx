@@ -184,11 +184,10 @@ export function GlobalChatbot() {
                           className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}
                         >
                           <div
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border ${
-                              isUser
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border ${isUser
                                 ? "border-edge bg-surface-2 text-muted"
                                 : "border-primary/30 bg-primary-soft text-primary"
-                            }`}
+                              }`}
                           >
                             {isUser ? (
                               <User className="h-4 w-4" />
@@ -197,11 +196,10 @@ export function GlobalChatbot() {
                             )}
                           </div>
                           <div
-                            className={`max-w-[75%] rounded-lg border px-4 py-3 ${
-                              isUser
+                            className={`max-w-[75%] rounded-lg border px-4 py-3 ${isUser
                                 ? "border-primary/40 bg-primary-soft"
                                 : "border-edge bg-surface-2/70"
-                            }`}
+                              }`}
                           >
                             {!isUser && (
                               <div className="mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">

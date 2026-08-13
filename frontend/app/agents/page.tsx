@@ -57,6 +57,18 @@ export default function AgentsPage() {
 
   return (
     <div className="space-y-6">
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .site-grid, .site-atmosphere {
+              display: none !important;
+            }
+            body {
+              background-color: var(--color-bg) !important;
+            }
+          `,
+        }}
+      />
       <PageHeader
         center
         eyebrow="The crew"
@@ -83,6 +95,7 @@ export default function AgentsPage() {
                 className="h-full"
               >
                 <Card
+                  data-tour="agent-card"
                   role="button"
                   tabIndex={0}
                   aria-pressed={selected}
@@ -134,7 +147,9 @@ export default function AgentsPage() {
                           <Check className="h-3 w-3" />
                         </span>
                       )}
-                      <StatusBadge status={status} />
+                      <span data-tour="agent-status" className="inline-flex">
+                        <StatusBadge status={status} />
+                      </span>
                     </div>
                   </CardHeader>
                   <CardBody className="flex flex-1 flex-col gap-3">
@@ -208,6 +223,7 @@ export default function AgentsPage() {
                         {agent.allowed_tools.length} tools
                       </span>
                       <Button
+                        data-tour="agent-memory"
                         variant="ghost"
                         size="sm"
                         onClick={(e) => {

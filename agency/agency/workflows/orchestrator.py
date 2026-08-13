@@ -348,6 +348,9 @@ class WorkflowOrchestrator:
         (validate → build → deploy → verify) driven by the same orchestrator
         loop, so progress streams over the activity feed like any other run.
         """
+        from agency.services import settings as settings_service
+
+        settings_service.ensure_api_configured()
         run = WorkflowRun(
             project_id=project.id,
             kind="deploy",
@@ -742,6 +745,11 @@ class WorkflowOrchestrator:
         snapshot: dict[str, tuple[int, int]],
     ) -> dict[str, Any]:
         kind = step.agent_kind or "planner"
+        # Re-check before every step: if the API key was cleared mid-run the
+        # step must fail loudly instead of running against a null provider.
+        from agency.services import settings as settings_service
+
+        settings_service.ensure_api_configured()
         if step.handler == "review_run" or kind == "code_reviewer":
             return await self._run_review(session, run, step, state)
         if step.handler == "review_fix":

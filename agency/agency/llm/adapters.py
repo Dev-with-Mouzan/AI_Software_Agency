@@ -583,7 +583,14 @@ def get_provider() -> BaseLLMProvider:
     from agency.llm.provider import NullProvider
 
     if provider in {"null", "mock", "offline"}:
-        return NullProvider(model=settings.llm_model, temperature=settings.llm_temperature)
+        # The offline provider is only valid in the explicit test environment.
+        # Anywhere else it silently "succeeds" without an LLM — which fakes
+        # completed work — so it must fail loudly instead.
+        if settings.environment == "test":
+            return NullProvider(model=settings.llm_model, temperature=settings.llm_temperature)
+        from agency.services.settings import AI_PROVIDER_NOT_CONFIGURED_MESSAGE
+
+        raise RuntimeError(AI_PROVIDER_NOT_CONFIGURED_MESSAGE)
 
     raise RuntimeError(
         f"Unknown LLM_PROVIDER={settings.llm_provider!r}. "

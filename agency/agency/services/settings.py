@@ -28,6 +28,24 @@ from agency.schemas.settings import (
     SettingsOut,
 )
 
+AI_PROVIDER_NOT_CONFIGURED_CODE = "AI_PROVIDER_NOT_CONFIGURED"
+
+AI_PROVIDER_NOT_CONFIGURED_MESSAGE = (
+    "AI provider not configured. Add your API key in Settings to run agents."
+)
+
+
+class AIProviderNotConfiguredError(RuntimeError):
+    """Raised when an agent/chat/workflow is dispatched without a usable LLM.
+
+    Mapped by the API layer to an HTTP 503 with a machine-readable
+    ``code`` (``AI_PROVIDER_NOT_CONFIGURED``) so the frontend can show the
+    exact, friendly message instead of a fake success or a raw traceback.
+    """
+
+    code = AI_PROVIDER_NOT_CONFIGURED_CODE
+
+
 PROVIDERS = ("openai", "gemini", "deepseek", "qwen")
 
 PROVIDER_LABELS = {
@@ -152,20 +170,20 @@ def runtime_agent_assignment(kind: str) -> tuple[str, str] | None:
 
 
 def ensure_api_configured() -> None:
-    """Raise unless an API key is configured — the gate before building software.
+    """Raise unless a usable AI API key/provider is configured — the gate before
+    any agent, chat, workflow or AI-powered action may run.
 
-    Offline mode (`LLM_PROVIDER=null|mock|offline`) is always allowed: it is the
-    explicit demo/no-network mode and the workflow tests rely on it.
+    No silent offline/demo fallback: a missing key must fail loudly with the
+    machine-readable ``AIProviderNotConfiguredError`` so nothing is created,
+    modified or reported as completed. The only exception is the explicit test
+    environment, where the offline (null) provider is intentionally opted in.
     """
     if any_provider_configured():
         return
     s = get_settings()
-    if s.llm_provider in {"null", "mock", "offline"}:
+    if s.environment == "test" and s.llm_provider in {"null", "mock", "offline"}:
         return
-    raise RuntimeError(
-        "No AI provider is configured. Open Settings and connect an API key "
-        "(OpenAI, Gemini, DeepSeek or Qwen) before building software."
-    )
+    raise AIProviderNotConfiguredError(AI_PROVIDER_NOT_CONFIGURED_MESSAGE)
 
 
 # --- per-agent routing --------------------------------------------------

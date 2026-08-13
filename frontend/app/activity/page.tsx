@@ -177,7 +177,7 @@ export default function ActivityPage() {
           <Card className="overflow-hidden">
             <CardBody className="p-0">
               {/* Filters */}
-              <div className="flex flex-wrap gap-2 border-b border-edge-soft px-4 py-3 sm:px-5">
+              <div className="flex flex-wrap gap-2 border-b border-edge-soft px-4 py-3 sm:px-5" data-tour="activity-filters">
                 {FILTERS.map((f) => (
                   <button
                     key={f.key}
@@ -203,6 +203,7 @@ export default function ActivityPage() {
                   <EmptyState title="Nothing in this view" />
                 </div>
               ) : (
+                <div data-tour="activity-feed">
                 <Stagger className="divide-y divide-edge-soft" step={0.03}>
                   {filtered.map((entry) => {
                     const meta = ACTION_META[entry.action] ?? FALLBACK_META;
@@ -245,6 +246,7 @@ export default function ActivityPage() {
                     );
                   })}
                 </Stagger>
+                </div>
               )}
             </CardBody>
           </Card>

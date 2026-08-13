@@ -159,6 +159,7 @@ export function Hero() {
               >
                 <Link href="/workflows" className="flex-1 sm:flex-none">
                   <Button
+                    data-tour="hero-cta-run"
                     size="lg"
                     className="max-lg:h-14 max-lg:w-full max-lg:rounded-[18px] max-lg:text-base"
                   >
@@ -167,6 +168,7 @@ export function Hero() {
                 </Link>
                 <Link href="/projects" className="flex-1 sm:flex-none">
                   <Button
+                    data-tour="hero-cta-projects"
                     variant="secondary"
                     size="lg"
                     className="max-lg:h-14 max-lg:w-full max-lg:rounded-[18px] max-lg:text-base"
@@ -179,6 +181,7 @@ export function Hero() {
               {/* Mobile-only quick stats — 2-col glass grid */}
               <motion.div
                 variants={heroItem}
+                data-tour="hero-stats"
                 className="mt-8 grid w-full grid-cols-2 gap-3 lg:hidden"
               >
                 <HeroStat label="online" value={onlineAgents} />
@@ -190,6 +193,7 @@ export function Hero() {
               {/* Live chips — desktop only */}
               <motion.div
                 variants={heroItem}
+                data-tour="hero-stats"
                 className="mt-6 hidden flex-wrap gap-2 lg:flex"
               >
                 <span className="glass inline-flex items-center gap-2 rounded-full border border-edge px-3.5 py-1.5 text-xs text-text-dim">

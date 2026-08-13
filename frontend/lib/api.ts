@@ -6,13 +6,32 @@ const UPLOAD_TIMEOUT_MS = 120_000;
 export class ApiClientError extends Error {
   status: number;
   detail: string;
+  code?: string;
 
-  constructor(status: number, detail: string) {
+  constructor(status: number, detail: string, code?: string) {
     super(detail);
     this.name = "ApiClientError";
     this.status = status;
     this.detail = detail;
+    this.code = code;
   }
+}
+
+export const AI_PROVIDER_NOT_CONFIGURED_CODE = "AI_PROVIDER_NOT_CONFIGURED";
+
+export function isProviderNotConfigured(error: unknown): boolean {
+  return (
+    error instanceof ApiClientError &&
+    (error.code === AI_PROVIDER_NOT_CONFIGURED_CODE ||
+      /provider.*(?:is )?not configured|no (?:ai )?provider|add an api key|connect an api key/i.test(
+        error.detail,
+      ))
+  );
+}
+
+interface ErrorBody {
+  detail?: string | Array<unknown>;
+  code?: string;
 }
 
 function timeoutSignal(ms: number): { signal: AbortSignal; done: () => void } {
@@ -73,13 +92,15 @@ async function request<T>(
 
   if (!res.ok) {
     let detail = `Request failed with status ${res.status}`;
+    let code: string | undefined;
     try {
-      const body = (await res.json()) as { detail?: string | Array<unknown> };
+      const body = (await res.json()) as ErrorBody;
       if (typeof body.detail === "string") detail = body.detail;
+      if (typeof body.code === "string") code = body.code;
     } catch {
       // ignore parse errors; keep default message
     }
-    throw new ApiClientError(res.status, detail);
+    throw new ApiClientError(res.status, detail, code);
   }
 
   if (res.status === 204) {
@@ -136,13 +157,15 @@ export async function uploadFile<T>(
 
   if (!res.ok) {
     let detail = `Request failed with status ${res.status}`;
+    let code: string | undefined;
     try {
-      const body = (await res.json()) as { detail?: string | Array<unknown> };
+      const body = (await res.json()) as ErrorBody;
       if (typeof body.detail === "string") detail = body.detail;
+      if (typeof body.code === "string") code = body.code;
     } catch {
       // keep default message
     }
-    throw new ApiClientError(res.status, detail);
+    throw new ApiClientError(res.status, detail, code);
   }
   return readJson<T>(res);
 }
@@ -160,13 +183,15 @@ export async function fetchBlob(path: string): Promise<Blob> {
 
   if (!res.ok) {
     let detail = `Request failed with status ${res.status}`;
+    let code: string | undefined;
     try {
-      const body = (await res.json()) as { detail?: string | Array<unknown> };
+      const body = (await res.json()) as ErrorBody;
       if (typeof body.detail === "string") detail = body.detail;
+      if (typeof body.code === "string") code = body.code;
     } catch {
       // keep default message
     }
-    throw new ApiClientError(res.status, detail);
+    throw new ApiClientError(res.status, detail, code);
   }
   return res.blob();
 }

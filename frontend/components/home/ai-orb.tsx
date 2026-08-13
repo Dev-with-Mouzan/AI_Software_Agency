@@ -86,8 +86,8 @@ const NODES: readonly OrbitNodeConfig[] = [
 function OrbitNode({ node }: { node: OrbitNodeConfig }) {
   const Icon = node.icon;
   const reduced = useReducedMotion();
-  // 4 rings: 45%, 35%, 25%, 15% radii
-  const radii = ["45%", "35%", "25%", "15%"] as const;
+  // 4 rings: 45%, 35%, 25%, 18% radii
+  const radii = ["45%", "35%", "25%", "18%"] as const;
   const r = radii[node.ringIndex];
 
   // Compute negative animationDelay to offset the start angle.
@@ -366,7 +366,7 @@ export function AgentOrbit({ className }: { className?: string }) {
         <OrbitRing r="45" stroke="var(--color-orbit-info)" duration="80s" reverse />
         <OrbitRing r="35" stroke="var(--color-orbit-accent)" duration="70s" />
         <OrbitRing r="25" stroke="var(--color-orbit-primary)" duration="60s" reverse />
-        <OrbitRing r="15" stroke="var(--color-orbit-warning)" duration="50s" />
+        <OrbitRing r="18" stroke="var(--color-orbit-warning)" duration="50s" />
 
         {/* Single satellite on the outer ring — matches its direction */}
         <OrbitDot r="45" color="var(--color-orbit-info)" duration="80s" reverse />
