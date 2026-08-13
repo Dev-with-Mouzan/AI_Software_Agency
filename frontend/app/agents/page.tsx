@@ -31,6 +31,7 @@ const PROVIDER_TONES: Record<string, { dot: string; text: string; edge: string }
   gemini: { dot: "bg-sky-400", text: "text-sky-400", edge: "from-sky-400/70" },
   deepseek: { dot: "bg-violet-400", text: "text-violet-400", edge: "from-violet-400/70" },
   qwen: { dot: "bg-teal-400", text: "text-teal-400", edge: "from-teal-400/70" },
+  null: { dot: "bg-edge", text: "text-muted", edge: "from-edge/70" },
 };
 
 export default function AgentsPage() {

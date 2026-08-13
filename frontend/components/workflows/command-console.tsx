@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Check, FileUp, Play, Sparkles, Terminal } from "lucide-react";
+import { AlertCircle, ArrowRight, Check, CheckCircle2, FileUp, Play, Sparkles, Terminal } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -230,38 +230,61 @@ export function CommandConsole({
           </Field>
 
           {planMode === "upload" && (
-            <div className="rounded-md border border-edge bg-surface-2/70 px-4 py-3">
-              <Field label="Plan file (.md / .txt)">
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="min-w-0 flex-1">
-                    <FileDropzone
-                      accept=".md,.markdown,.txt"
-                      value={planFile}
-                      disabled={!projectId}
-                      onChange={(file) => {
-                        setPlanFile(file);
-                        setPlanUploaded(false);
-                      }}
-                    />
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={submitPlan}
-                    loading={upload.isPending}
-                    disabled={!planFile || !projectId}
-                  >
-                    <FileUp className="h-3.5 w-3.5" /> Upload plan
-                  </Button>
+            <div className="overflow-hidden rounded-md border border-edge bg-surface-2/70">
+              {/* Header bar */}
+              <div className="flex items-center gap-2 border-b border-edge-soft px-3 py-2 sm:px-4">
+                <FileUp className="h-3.5 w-3.5 text-primary" />
+                <span className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-muted">
+                  Plan file (.md / .txt)
+                </span>
+              </div>
+
+              {/* Body */}
+              <div className="flex flex-col gap-3 p-3 sm:p-4">
+                <FileDropzone
+                  accept=".md,.markdown,.txt"
+                  value={planFile}
+                  disabled={!projectId}
+                  onChange={(file) => {
+                    setPlanFile(file);
+                    setPlanUploaded(false);
+                  }}
+                />
+
+                {/* Full-width upload button — 44 px touch target on mobile */}
+                <Button
+                  variant="primary"
+                  className="h-11 w-full text-sm sm:h-9"
+                  onClick={submitPlan}
+                  loading={upload.isPending}
+                  disabled={!planFile || !projectId}
+                >
+                  <FileUp className="h-4 w-4" /> Upload plan
+                </Button>
+
+                {/* Status message with icon */}
+                <div
+                  className={cn(
+                    "flex items-start gap-2 rounded-md px-3 py-2 text-[11px] leading-tight",
+                    planUploaded
+                      ? "border border-emerald-500/25 bg-emerald-500/10 text-emerald-400"
+                      : "border border-edge bg-surface-2 text-text-dim",
+                  )}
+                >
+                  {planUploaded ? (
+                    <CheckCircle2 className="mt-px h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                  ) : (
+                    <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0 text-muted" />
+                  )}
+                  <span className="font-medium">
+                    {!projectId
+                      ? "Select a project first to upload your plan."
+                      : planUploaded
+                        ? "Plan uploaded. The engineers will follow it."
+                        : "Pick a .md or .txt file, then tap Upload plan."}
+                  </span>
                 </div>
-              </Field>
-              <p className="mt-2 text-[11px] font-medium text-text-dim">
-                {!projectId
-                  ? "Select a project first — the plan is saved to its docs/implementation_plan.md."
-                  : planUploaded
-                    ? "Plan uploaded. The engineers will follow it."
-                    : "Pick a .md or .txt file to upload."}
-              </p>
+              </div>
             </div>
           )}
 

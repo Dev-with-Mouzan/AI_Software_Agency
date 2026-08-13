@@ -79,8 +79,6 @@ class NullProvider(BaseLLMProvider):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
-        from agency.config import get_settings
-
         _ = temperature, max_tokens
         last_user = ""
         for msg in reversed(messages):
@@ -119,11 +117,11 @@ class NullProvider(BaseLLMProvider):
                         finish_reason="tool_calls",
                     )
 
-        mode = get_settings().environment
         reply = (
-            f"[{self.model}] Received: {last_user[:400]}\n"
-            f"Running in offline (null) provider mode. Configure LLM_PROVIDER to get "
-            f"intelligent agent responses. Environment: {mode}."
+            "⚠️ No AI provider is configured.\n\n"
+            "To get intelligent responses from this agent, please go to **Settings** and "
+            "add an API key for one of the supported providers (OpenAI, Gemini, DeepSeek, or Qwen).\n\n"
+            "Once an API key is saved, your agents will be fully operational."
         )
         return LLMResponse(text=reply, finish_reason="stop")
 
