@@ -203,7 +203,7 @@ export default function ProjectsPage() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         title="Delete project?"
-        description="This removes the project and everything tied to it — tasks, runs, milestones and knowledge. Files on disk are left untouched."
+        description="This removes the project, its files and everything tied to it — tasks, runs, milestones and knowledge."
         footer={
           <>
             <Button

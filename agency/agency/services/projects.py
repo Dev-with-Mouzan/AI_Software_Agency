@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 from uuid import UUID
 
+import shutil
+
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -117,16 +119,31 @@ class ProjectService:
         *,
         actor: str = "human",
     ) -> bool:
-        """Delete a project and its dependent records.
+        """Delete a project, its dependent records and its workspace folder.
 
         Milestones, tasks, comments, knowledge chunks, workflow runs and
         deployments cascade through their FKs; agent memory entries are removed
-        explicitly (no FK on `scope_id`). Workspace files on disk are left
-        untouched so adopted repositories are never harmed.
+        explicitly (no FK on `scope_id`). The on-disk workspace folder is
+        removed too, but only when it lives safely inside the working area —
+        never the working area itself and never a folder outside it. The folder
+        is removed *before* the DB rows so a failure aborts the whole deletion
+        (nothing is committed) instead of leaving an orphaned record.
         """
         project = await session.get(Project, project_id)
         if project is None:
             return False
+
+        working_area = get_settings().working_area.resolve()
+        root_dir = Path(project.root_dir).resolve()
+        if root_dir == working_area:
+            raise ValueError(f"refusing to delete the working area root: {root_dir}")
+        if root_dir.is_relative_to(working_area):
+            try:
+                shutil.rmtree(root_dir, ignore_errors=False)
+            except FileNotFoundError:
+                pass
+        elif root_dir.exists():
+            raise ValueError(f"refusing to delete folder outside the working area: {root_dir}")
 
         await session.execute(
             delete(AgentMemory).where(

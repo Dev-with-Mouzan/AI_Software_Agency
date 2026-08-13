@@ -39,6 +39,8 @@ logs/
 *.sqlite
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
 projects/*/artifacts/
 projects/.index/
 knowledge/.index/
