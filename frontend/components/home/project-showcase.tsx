@@ -194,11 +194,7 @@ function SectionMarquee() {
       <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-bg to-transparent" />
       <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-bg to-transparent" />
 
-      <motion.div
-        className="flex w-max items-center whitespace-nowrap"
-        animate={{ x: ["-50%", "0%"] }}
-        transition={{ duration: 30, ease: "linear", repeat: Infinity }}
-      >
+      <div className="marquee-track flex w-max items-center whitespace-nowrap">
         {row.map((item, i) => (
           <span
             key={i}
@@ -208,7 +204,7 @@ function SectionMarquee() {
             <span className="ml-10 h-1 w-1 shrink-0 rounded-full bg-primary/70" aria-hidden />
           </span>
         ))}
-      </motion.div>
+      </div>
     </div>
   );
 }

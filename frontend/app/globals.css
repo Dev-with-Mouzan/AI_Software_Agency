@@ -645,3 +645,20 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Endless word marquee — always animates, even with reduced motion enabled.
+   The track holds exactly two copies of the phrase list, so -50% is one full
+   copy width and the loop restarts seamlessly. */
+@keyframes marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee-scroll 26s linear infinite !important;
+  will-change: transform;
+}
