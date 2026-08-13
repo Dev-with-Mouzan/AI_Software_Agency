@@ -17,6 +17,8 @@ interface DialogProps {
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
+  /** Keep the page background untouched (no dim/backdrop-blur overlay). */
+  clearOverlay?: boolean;
 }
 
 export function Dialog({
@@ -27,6 +29,7 @@ export function Dialog({
   children,
   footer,
   wide,
+  clearOverlay = false,
 }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -76,7 +79,7 @@ export function Dialog({
           aria-label={title}
         >
           <motion.div
-            className="absolute inset-0 bg-overlay backdrop-blur-sm"
+            className={cn("absolute inset-0", !clearOverlay && "bg-overlay backdrop-blur-sm")}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

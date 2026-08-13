@@ -20,7 +20,13 @@ export function AgentMemoryDialog({
   const memory = useMemory(agentKind);
 
   return (
-    <Dialog open={!!agentKind} onClose={onClose} title={`${agentName} — memory`} wide>
+    <Dialog
+      open={!!agentKind}
+      onClose={onClose}
+      title={`${agentName} — memory`}
+      wide
+      clearOverlay
+    >
       <div className="space-y-3">
         {memory.isLoading && <PageLoader label="Recalling memories…" />}
         {memory.data?.map((entry) => (

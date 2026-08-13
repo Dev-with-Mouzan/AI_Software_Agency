@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input, Select } from "@/components/ui/input";
 import { useChat, useProjects } from "@/lib/hooks";
 import type { ChatResponse } from "@/lib/types";
+import { humanizeChatReply } from "@/lib/chat";
 import { timeAgo } from "@/lib/format";
 
 interface Message {
@@ -84,7 +85,7 @@ export function GlobalChatbot() {
             {
               id: idRef.current++,
               role: "agent",
-              content: response.reply,
+              content: humanizeChatReply(response.reply),
               agent_kind: response.agent_kind,
               agent: response.agent,
               needs_human: response.needs_human,
@@ -101,7 +102,7 @@ export function GlobalChatbot() {
               role: "agent",
               agent_kind: "routing",
               agent: "System",
-              content: `⚠ ${(error as Error).message}`,
+              content: humanizeChatReply(`⚠ ${(error as Error).message}`),
             },
           ]);
         },

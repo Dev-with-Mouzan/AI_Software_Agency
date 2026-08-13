@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import { AlertTriangle, Bot, Brain, Sparkles, Wrench } from "lucide-react";
+import { AlertTriangle, Bot, Brain, Check, Sparkles, Wrench } from "lucide-react";
 
 import { StatusBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,11 @@ export default function AgentsPage() {
     kind: string;
     name: string;
   } | null>(null);
+  const [selectedKind, setSelectedKind] = useState<string | null>(null);
+
+  const toggleSelected = (kind: string) => {
+    setSelectedKind((prev) => (prev === kind ? null : kind));
+  };
 
   if (agents.isLoading || !agents.data) {
     return <PageLoader label="Loading the team…" />;
@@ -68,6 +73,7 @@ export default function AgentsPage() {
             PROVIDER_LABELS[provider] ?? agent.llm_provider ?? "Default";
           const tone = PROVIDER_TONES[provider] ?? PROVIDER_TONES.null;
           const status = rt?.status ?? agent.status;
+          const selected = selectedKind === agent.kind;
           return (
             <StaggerItem key={agent.id} className="h-full min-w-0">
               <motion.div
@@ -76,12 +82,32 @@ export default function AgentsPage() {
                 transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 className="h-full"
               >
-                <Card className="flex h-full flex-col overflow-hidden">
+                <Card
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selected}
+                  onClick={() => toggleSelected(agent.kind)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      toggleSelected(agent.kind);
+                    }
+                  }}
+                  className={cn(
+                    "flex h-full cursor-pointer flex-col overflow-hidden transition-colors duration-200",
+                    selected &&
+                      "border-primary/60 bg-surface ring-1 ring-primary/40",
+                  )}
+                >
                   <span
                     aria-hidden
                     className={cn(
                       "h-px w-full bg-gradient-to-r to-transparent",
-                      configured ? tone.edge : "from-edge",
+                      selected
+                        ? "from-primary"
+                        : configured
+                          ? tone.edge
+                          : "from-edge",
                     )}
                   />
                   <CardHeader>
@@ -103,6 +129,11 @@ export default function AgentsPage() {
                           {agent.kind}
                         </p>
                       </div>
+                      {selected && (
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-ink">
+                          <Check className="h-3 w-3" />
+                        </span>
+                      )}
                       <StatusBadge status={status} />
                     </div>
                   </CardHeader>
@@ -179,9 +210,10 @@ export default function AgentsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() =>
-                          setMemoryFor({ kind: agent.kind, name: agent.name })
-                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMemoryFor({ kind: agent.kind, name: agent.name });
+                        }}
                       >
                         <Brain className="h-3.5 w-3.5" /> Memory
                       </Button>
