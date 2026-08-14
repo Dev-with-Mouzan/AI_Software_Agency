@@ -232,9 +232,12 @@
   .site-grid {
     opacity: 0.09;
   }
+}
 
-  /* Sticky mobile navbar — always has a blurred surface so content never
-     bleeds through, at a constant 64px height. */
+/* Sticky mobile navbar (shown below the lg desktop nav) — always has a
+   blurred surface so content never bleeds through. Height is driven by the
+   layout component so it can collapse on scroll. */
+@media (max-width: 1023.98px) {
   .navbar-mobile {
     background: color-mix(in srgb, var(--color-surface) 88%, transparent);
     backdrop-filter: blur(20px) saturate(1.5);

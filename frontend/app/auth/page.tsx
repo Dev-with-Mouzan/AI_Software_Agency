@@ -75,6 +75,7 @@ function PasswordField({
   minLength,
   hint,
   invalid,
+  readOnly,
 }: {
   label: string;
   htmlFor: string;
@@ -85,6 +86,7 @@ function PasswordField({
   minLength?: number;
   hint?: string;
   invalid?: boolean;
+  readOnly?: boolean;
 }) {
   const [visible, setVisible] = useState(false);
   return (
@@ -99,6 +101,7 @@ function PasswordField({
           placeholder={placeholder}
           autoComplete={autoComplete}
           minLength={minLength}
+          readOnly={readOnly}
           aria-invalid={invalid}
           className="pr-10"
         />
@@ -177,6 +180,15 @@ function AuthCard() {
   const [busy, setBusy] = useState(false);
   const [sending, setSending] = useState(false);
   const [resendAfter, setResendAfter] = useState(0);
+  // Held readOnly for the first ~250ms so Chrome/Edge don't auto-fill the
+  // saved credentials into a freshly opened login form (e.g. after logout).
+  const [suppressAutofill, setSuppressAutofill] = useState(true);
+
+  useEffect(() => {
+    setSuppressAutofill(true);
+    const t = window.setTimeout(() => setSuppressAutofill(false), 250);
+    return () => window.clearTimeout(t);
+  }, [mode]);
 
   const switchMode = (m: Mode) => {
     setMode(m);
@@ -486,7 +498,8 @@ function AuthCard() {
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
                               placeholder="you@company.com"
-                              autoComplete="email"
+                              autoComplete={suppressAutofill ? "off" : "email"}
+                              readOnly={suppressAutofill}
                               autoFocus={!isSignup}
                             />
                           </Field>
@@ -497,7 +510,14 @@ function AuthCard() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder="••••••••"
-                            autoComplete={isSignup ? "new-password" : "current-password"}
+                            autoComplete={
+                              suppressAutofill
+                                ? "off"
+                                : isSignup
+                                  ? "new-password"
+                                  : "current-password"
+                            }
+                            readOnly={suppressAutofill}
                             minLength={isSignup ? 8 : undefined}
                           />
 

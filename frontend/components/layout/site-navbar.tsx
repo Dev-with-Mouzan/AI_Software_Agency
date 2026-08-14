@@ -69,10 +69,12 @@ function NavLink({
   item,
   onNavigate,
   pillId = "nav-pill",
+  variant = "pill",
 }: {
   item: NavItem;
   onNavigate?: () => void;
   pillId?: string;
+  variant?: "pill" | "drawer";
 }) {
   const pathname = usePathname();
   const active = item.match(pathname);
@@ -83,7 +85,10 @@ function NavLink({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 font-display text-[13px] font-semibold tracking-tight transition-colors duration-150",
+        "relative flex items-center whitespace-nowrap font-display text-[13px] font-semibold tracking-tight transition-colors duration-150",
+        variant === "drawer"
+          ? "w-full gap-3 rounded-xl px-4 py-3 text-[14px]"
+          : "gap-2 rounded-full px-4 py-2",
         active ? "text-primary-ink" : "text-text-dim hover:text-text",
       )}
     >
@@ -126,10 +131,10 @@ function AuthMenu() {
     return (
       <Link
         href="/auth?mode=login"
-        className="flex h-9 items-center gap-1.5 rounded-full bg-primary px-3.5 text-[13px] font-semibold text-primary-ink transition-colors hover:bg-primary-hover hover:shadow-glow"
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-ink transition-colors hover:bg-primary-hover hover:shadow-glow lg:h-9 lg:w-auto lg:gap-1.5 lg:px-3.5 lg:text-[13px] lg:font-semibold"
       >
         <LogIn className="h-3.5 w-3.5" aria-hidden />
-        <span className="hidden sm:inline">Sign in</span>
+        <span className="hidden lg:inline">Sign in</span>
       </Link>
     );
   }
@@ -147,7 +152,7 @@ function AuthMenu() {
         whileTap={{ scale: 0.9 }}
         aria-label="Account menu"
         aria-expanded={open}
-        className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-edge bg-surface-2 text-text-dim transition-colors hover:border-primary/40"
+        className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-edge bg-surface-2 text-text-dim transition-colors hover:border-primary/40 lg:h-9 lg:w-9"
       >
         <span
           aria-hidden
@@ -238,6 +243,16 @@ export function SiteNavbar() {
     setMobileOpen(false);
   }, [pathname]);
 
+  // Lock background scrolling while the mobile drawer is open.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileOpen]);
+
   const isOnline = health.data?.status === "ok";
 
   // The auth page is a focused screen — no navigation chrome.
@@ -258,24 +273,24 @@ export function SiteNavbar() {
           "navbar-mobile relative sticky top-0 z-40 transition-all duration-300",
           scrolled
             ? "glass-strong border-b border-edge shadow-panel"
-            : "border-b border-transparent bg-transparent",
+            : "border-b border-edge/50 lg:border-transparent",
         )}
       >
         <div
           className={cn(
-            "relative mx-auto flex max-w-[1300px] items-center justify-between px-4 transition-all duration-300 sm:px-6",
-            scrolled ? "h-14 max-lg:h-16" : "h-16",
+            "relative mx-auto flex max-w-[1300px] items-center justify-between px-3 transition-all duration-300 sm:px-6",
+            scrolled ? "h-12 lg:h-14" : "h-14 lg:h-16",
           )}
         >
           {/* Brand */}
           <div className="flex shrink-0 items-center">
-            <Link href="/" className="relative flex shrink-0 items-center gap-2.5" aria-label="DevPilot AI home">
+            <Link href="/" className="relative flex shrink-0 items-center gap-2" aria-label="DevPilot AI home">
               {/* Logo glow beacon */}
               <span
                 aria-hidden
                 className="pointer-events-none absolute -bottom-3 left-0 h-6 w-full rounded-full bg-primary/30 blur-xl"
               />
-              <span className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-primary/30">
+              <span className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-primary/30 lg:h-9 lg:w-9 lg:rounded-xl">
                 <span
                   aria-hidden
                   className="absolute inset-x-0 bottom-0 h-2 rounded-full bg-primary/60 blur-sm"
@@ -283,11 +298,11 @@ export function SiteNavbar() {
                 {/* eslint-disable-next-line @next/next/no-img-element -- brand logo */}
                 <img src="/logo.png" alt="" className="relative h-full w-full object-contain" />
               </span>
-              <span className="relative leading-tight">
-                <span className="block font-display text-[15px] font-bold tracking-tight text-text">
+              <span className="relative min-w-0 leading-tight">
+                <span className="block truncate font-display text-[14px] font-bold tracking-tight text-text lg:text-[15px]">
                   DevPilot AI
                 </span>
-                <span className="mt-1 block font-mono text-[9px] font-medium uppercase tracking-[0.24em] text-faint">
+                <span className="mt-0.5 block font-mono text-[8px] font-medium uppercase tracking-[0.22em] text-faint lg:mt-1 lg:text-[9px] lg:tracking-[0.24em]">
                   AI software studio
                 </span>
               </span>
@@ -304,7 +319,7 @@ export function SiteNavbar() {
             ))}
           </nav>
 
-          <div className="flex shrink-0 items-center justify-end gap-2">
+          <div className="flex shrink-0 items-center justify-end gap-1.5 lg:gap-2">
             <span
               className={cn(
                 "hidden items-center gap-2 rounded-full border border-edge bg-surface/70 px-3 py-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.16em] md:flex",
@@ -335,7 +350,7 @@ export function SiteNavbar() {
               onClick={toggleTheme}
               whileTap={{ scale: 0.9 }}
               aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-edge bg-surface/70 text-text-dim transition-colors hover:text-text"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-edge bg-surface/70 text-text-dim transition-colors hover:text-text lg:h-9 lg:w-9"
             >
               <AnimatePresence mode="wait" initial={false}>
                 <motion.span
@@ -358,7 +373,7 @@ export function SiteNavbar() {
             <Link
               href="/settings"
               aria-label="Settings"
-              className="hidden h-9 w-9 items-center justify-center rounded-full border border-edge bg-surface/70 text-text-dim transition-colors hover:text-text sm:flex"
+              className="hidden h-8 w-8 items-center justify-center rounded-full border border-edge bg-surface/70 text-text-dim transition-colors hover:text-text sm:flex lg:h-9 lg:w-9"
             >
               <Settings className="h-4 w-4" />
             </Link>
@@ -369,7 +384,7 @@ export function SiteNavbar() {
               whileTap={{ scale: 0.9 }}
               aria-label="Toggle navigation menu"
               aria-expanded={mobileOpen}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-edge bg-surface/70 text-text-dim transition-colors hover:text-text lg:hidden"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-edge bg-surface/70 text-text-dim transition-colors hover:text-text lg:h-9 lg:w-9 lg:hidden"
             >
               {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </motion.button>
@@ -390,11 +405,11 @@ export function SiteNavbar() {
         <AnimatePresence>
           {mobileOpen && (
             <motion.nav
-              initial={{ opacity: 0, y: -12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ type: "spring", stiffness: 400, damping: 34 }}
-              className="glass-strong absolute inset-x-3 top-full z-50 mt-2 max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-2xl border border-edge p-2 shadow-pop scrollbar-none lg:hidden"
+              initial={{ opacity: 0, y: -10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.99 }}
+              transition={{ type: "spring", stiffness: 420, damping: 34 }}
+              className="glass-strong panel-glow absolute inset-x-3 top-full z-50 mt-2 max-h-[calc(100dvh-4.5rem)] overflow-y-auto rounded-2xl border border-edge p-2 shadow-pop scrollbar-none lg:hidden"
               aria-label="Mobile"
             >
               <div className="space-y-1">
@@ -403,6 +418,7 @@ export function SiteNavbar() {
                     key={item.href}
                     item={item}
                     pillId="nav-pill-mobile"
+                    variant="drawer"
                     onNavigate={() => setMobileOpen(false)}
                   />
                 ))}
@@ -411,9 +427,9 @@ export function SiteNavbar() {
                 <Link
                   href="/settings"
                   onClick={() => setMobileOpen(false)}
-                  className="flex items-center justify-center gap-2 rounded-lg border border-edge bg-surface-2 px-3 py-2.5 font-display text-[13px] font-semibold text-text-dim transition-colors hover:text-text"
+                  className="flex h-11 items-center gap-3 rounded-xl px-4 font-display text-[14px] font-semibold text-text-dim transition-colors hover:bg-surface-2 hover:text-text"
                 >
-                  <Settings className="h-4 w-4" /> Settings
+                  <Settings className="h-4 w-4" aria-hidden /> Settings
                 </Link>
               </div>
             </motion.nav>
