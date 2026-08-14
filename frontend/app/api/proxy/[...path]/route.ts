@@ -8,7 +8,10 @@ const API_URL = (
 
 const TOKEN = process.env.API_TOKEN || process.env.AGENCY_API_TOKEN || "";
 
-const FORWARD_HEADERS = ["content-type", "accept"];
+// Authorization is forwarded from the browser so per-user JWTs reach the API.
+// When no client session exists, the env API_TOKEN is used as a fallback for
+// server-to-server requests.
+const FORWARD_HEADERS = ["content-type", "accept", "authorization"];
 
 const SECURITY_HEADERS: Record<string, string> = {
   "Cache-Control": "no-store",
@@ -29,7 +32,9 @@ async function proxyHandler(
     const value = req.headers.get(name);
     if (value) headers[name] = value;
   }
-  if (TOKEN) headers["authorization"] = `Bearer ${TOKEN}`;
+  if (!headers["authorization"] && TOKEN) {
+    headers["authorization"] = `Bearer ${TOKEN}`;
+  }
 
   let body: BodyInit | undefined;
   if (req.method !== "GET" && req.method !== "HEAD") {

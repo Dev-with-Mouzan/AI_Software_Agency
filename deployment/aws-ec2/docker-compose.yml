@@ -40,6 +40,18 @@ services:
       # Shared secret the frontend proxy forwards as a Bearer token.
       API_TOKEN: ${API_TOKEN:?set API_TOKEN in .env}
       WORKING_AREA: /app/working-area
+      # Auth: JWT signing secret + optional Google sign-in.
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      # Email verification (Resend SMTP). Without these, production 503s on send-code.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
+      SMTP_TLS: ${SMTP_TLS:-}
+      VERIFICATION_CODE_TTL_MINUTES: ${VERIFICATION_CODE_TTL_MINUTES:-}
       # LLM provider keys + agent routing (same block as the local .env).
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-}

@@ -5,7 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 
-from agency.api.deps import DbSession
+from agency.api.deps import CurrentUser, DbSession
+from agency.api.ownership import require_owned_project
+from agency.services.projects import project_service
 from agency.schemas.workspace import (
     DirListingOut,
     FileContentOut,
@@ -20,16 +22,21 @@ router = APIRouter(prefix="/workspace", tags=["workspace"])
 
 
 @router.get("/folders", response_model=list[WorkspaceFolderOut])
-async def list_folders(session: DbSession) -> list[WorkspaceFolderOut]:
-    folders = await workspace_service.list_folders(session)
+async def list_folders(session: DbSession, user: CurrentUser) -> list[WorkspaceFolderOut]:
+    folders = await workspace_service.list_folders(session, owner_id=user.id)
     return [WorkspaceFolderOut(**f) for f in folders]
 
 
 @router.post("/folders", response_model=WorkspaceFolderOut, status_code=201)
-async def create_folder(payload: WorkspaceCreate, session: DbSession) -> WorkspaceFolderOut:
+async def create_folder(
+    payload: WorkspaceCreate, session: DbSession, user: CurrentUser
+) -> WorkspaceFolderOut:
     try:
         project = await workspace_service.create_project(
-            session, name=payload.name, description=payload.description
+            session,
+            name=payload.name,
+            description=payload.description,
+            owner_id=user.id,
         )
     except WorkspaceError as exc:
         raise HTTPException(409, str(exc)) from exc
@@ -46,9 +53,13 @@ async def create_folder(payload: WorkspaceCreate, session: DbSession) -> Workspa
 
 
 @router.post("/folders/adopt", response_model=WorkspaceFolderOut, status_code=201)
-async def adopt_folder(payload: WorkspaceAdopt, session: DbSession) -> WorkspaceFolderOut:
+async def adopt_folder(
+    payload: WorkspaceAdopt, session: DbSession, user: CurrentUser
+) -> WorkspaceFolderOut:
     try:
-        project = await workspace_service.adopt_folder(session, payload.folder_name)
+        project = await workspace_service.adopt_folder(
+            session, payload.folder_name, owner_id=user.id
+        )
     except WorkspaceError as exc:
         raise HTTPException(404, str(exc)) from exc
     await session.commit()
@@ -63,8 +74,19 @@ async def adopt_folder(payload: WorkspaceAdopt, session: DbSession) -> Workspace
     )
 
 
+async def _owned_project_by_slug(session: DbSession, slug: str, user) -> None:
+    project = await project_service.get_by_slug(session, slug)
+    if project is None:
+        raise HTTPException(404, "project not found")
+    if project.owner_id != user.id:
+        raise HTTPException(403, "you do not have access to this project")
+
+
 @router.get("/folders/{slug}/tree", response_model=WorkspaceTreeOut)
-async def folder_tree(slug: str, session: DbSession) -> WorkspaceTreeOut:
+async def folder_tree(
+    slug: str, session: DbSession, user: CurrentUser
+) -> WorkspaceTreeOut:
+    await _owned_project_by_slug(session, slug, user)
     try:
         tree = await workspace_service.folder_tree(session, slug)
     except WorkspaceError as exc:
@@ -76,8 +98,10 @@ async def folder_tree(slug: str, session: DbSession) -> WorkspaceTreeOut:
 async def folder_dir(
     slug: str,
     session: DbSession,
+    user: CurrentUser,
     path: str = Query("", description="project-relative directory path"),
 ) -> DirListingOut:
+    await _owned_project_by_slug(session, slug, user)
     try:
         listing = await workspace_service.list_dir(session, slug, path)
     except WorkspaceError as exc:
@@ -89,8 +113,10 @@ async def folder_dir(
 async def read_project_file(
     slug: str,
     session: DbSession,
+    user: CurrentUser,
     path: str = Query(..., description="project-relative file path"),
 ) -> FileContentOut:
+    await _owned_project_by_slug(session, slug, user)
     try:
         content = await workspace_service.read_file(session, slug, path)
     except WorkspaceError as exc:
@@ -102,8 +128,10 @@ async def read_project_file(
 async def download_file(
     slug: str,
     session: DbSession,
+    user: CurrentUser,
     path: str = Query(..., description="project-relative file path"),
 ) -> FileResponse:
+    await _owned_project_by_slug(session, slug, user)
     try:
         file = await workspace_service.resolve_file(session, slug, path)
     except WorkspaceError as exc:
@@ -112,7 +140,10 @@ async def download_file(
 
 
 @router.get("/folders/{slug}/archive")
-async def download_archive(slug: str, session: DbSession) -> StreamingResponse:
+async def download_archive(
+    slug: str, session: DbSession, user: CurrentUser
+) -> StreamingResponse:
+    await _owned_project_by_slug(session, slug, user)
     try:
         filename, buffer = await workspace_service.project_archive(session, slug)
     except WorkspaceError as exc:

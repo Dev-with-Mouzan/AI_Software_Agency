@@ -14,6 +14,7 @@ import re
 import zipfile
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -124,9 +125,13 @@ class WorkspaceService:
         return root
 
     @staticmethod
-    async def list_folders(session: AsyncSession) -> list[dict[str, Any]]:
+    async def list_folders(
+        session: AsyncSession, owner_id: UUID | None = None
+    ) -> list[dict[str, Any]]:
         root = WorkspaceService.root()
-        projects = {p.slug: p for p in await project_service.list(session)}
+        projects = {
+            p.slug: p for p in await project_service.list(session, owner_id=owner_id)
+        }
         folders: list[dict[str, Any]] = []
         for folder in sorted(root.iterdir(), key=lambda p: p.name.lower()):
             if not folder.is_dir() or folder.name.startswith("."):
@@ -150,6 +155,7 @@ class WorkspaceService:
         *,
         name: str,
         description: str = "",
+        owner_id: UUID | None = None,
     ) -> Project:
         root = WorkspaceService.root()
         root.mkdir(parents=True, exist_ok=True)
@@ -164,10 +170,13 @@ class WorkspaceService:
             slug=slug,
             actor="human",
             workspace_mode="structured",
+            owner_id=owner_id,
         )
 
     @staticmethod
-    async def adopt_folder(session: AsyncSession, folder_name: str) -> Project:
+    async def adopt_folder(
+        session: AsyncSession, folder_name: str, owner_id: UUID | None = None
+    ) -> Project:
         """Register an existing folder (dropped in by the human) as a project."""
         root = WorkspaceService.root()
         folder = _resolve_inside(root, folder_name)
@@ -176,6 +185,8 @@ class WorkspaceService:
 
         existing = await session.scalar(select(Project).where(Project.slug == folder_name))
         if existing:
+            if existing.owner_id is not None and existing.owner_id != owner_id:
+                raise WorkspaceError("this folder is already registered to another account")
             return existing
 
         project = Project(
@@ -184,6 +195,7 @@ class WorkspaceService:
             description="Adopted existing project from the working area.",
             root_dir=str(folder),
             workspace_mode="free",
+            owner_id=owner_id,
         )
         session.add(project)
         await session.flush()

@@ -34,9 +34,66 @@ from agency.core.enums import (
 from agency.db.base import Base, UTCDateTime, UUIDPkMixin
 
 
+class User(UUIDPkMixin, Base):
+    """A registered DevPilot AI user (email/password or Google sign-in)."""
+
+    __tablename__ = "users"
+
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(120), default="")
+    password_hash: Mapped[str] = mapped_column(String(255), default="")
+    google_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Client-facing path served by GET /auth/avatar/{id} (e.g. "/auth/avatar/...")
+    avatar_url: Mapped[str] = mapped_column(String(300), default="")
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+    projects: Mapped[list[Project]] = relationship(
+        back_populates="owner", cascade="all, delete-orphan", lazy="selectin"
+    )
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class EmailVerificationCode(UUIDPkMixin, Base):
+    """Single-use verification code issued for an email address.
+
+    Codes exist *before* an account is created (sign-up flow), so they are
+    keyed by email string rather than a user FK. Only the SHA-256 hash is
+    stored, never the plaintext code.
+    """
+
+    __tablename__ = "email_verification_codes"
+
+    email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class RefreshToken(UUIDPkMixin, Base):
+    """Revocable refresh token (only the SHA-256 hash is stored)."""
+
+    __tablename__ = "refresh_tokens"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    user: Mapped[User] = relationship(back_populates="refresh_tokens")
+
+
 class Project(UUIDPkMixin, Base):
     __tablename__ = "projects"
 
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True
+    )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     slug: Mapped[str] = mapped_column(String(220), unique=True, index=True, nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
@@ -46,6 +103,7 @@ class Project(UUIDPkMixin, Base):
         String(20), default="structured"
     )  # structured (subfolders) | free (whole repo)
 
+    owner: Mapped[User | None] = relationship(back_populates="projects", lazy="joined")
     milestones: Mapped[list[Milestone]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",

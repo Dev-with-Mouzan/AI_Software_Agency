@@ -13,6 +13,7 @@ import { Stagger, StaggerItem, PopIn } from "@/components/motion/primitives";
 import { PageHeader } from "@/components/ui/page-header";
 import { useAgents, useAgentsRuntime } from "@/lib/hooks";
 import { timeAgo } from "@/lib/format";
+import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/cn";
 
 
@@ -37,11 +38,17 @@ const PROVIDER_TONES: Record<string, { dot: string; text: string; edge: string }
 export default function AgentsPage() {
   const agents = useAgents();
   const runtime = useAgentsRuntime();
+  const { requireAuth } = useAuth();
   const [memoryFor, setMemoryFor] = useState<{
     kind: string;
     name: string;
   } | null>(null);
   const [selectedKind, setSelectedKind] = useState<string | null>(null);
+
+  const openMemory = (kind: string, name: string) => {
+    if (!requireAuth()) return;
+    setMemoryFor({ kind, name });
+  };
 
   const toggleSelected = (kind: string) => {
     setSelectedKind((prev) => (prev === kind ? null : kind));
@@ -228,7 +235,7 @@ export default function AgentsPage() {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setMemoryFor({ kind: agent.kind, name: agent.name });
+                          openMemory(agent.kind, agent.name);
                         }}
                       >
                         <Brain className="h-3.5 w-3.5" /> Memory

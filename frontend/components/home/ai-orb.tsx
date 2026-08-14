@@ -2,7 +2,6 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import {
-  Bot,
   ClipboardList,
   Database,
   Monitor,
@@ -397,15 +396,13 @@ export function AgentOrbit({ className }: { className?: string }) {
               !reduced && "animate-ping-slow",
             )}
           />
-          <div className="relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-surface shadow-glow ring-2 ring-primary/30">
-            <span className="absolute inset-2 rounded-full bg-primary/10" />
-            <span
-              className={cn(
-                "absolute inset-0 rounded-full bg-primary/20",
-                !reduced && "animate-ping-slow [animation-delay:1.2s]",
-              )}
-            />
-            <Bot className="relative z-10 h-7 w-7 text-primary drop-shadow-[0_0_8px_var(--color-primary-glow)]" />
+          <span
+            aria-hidden
+            className="absolute bottom-[0.4rem] left-1/2 -z-10 h-5 w-20 -translate-x-1/2 rounded-[100%] bg-primary/60 blur-xl"
+          />
+          <div className="relative flex h-[4.5rem] w-[4.5rem] items-center justify-center overflow-hidden rounded-full bg-white shadow-glow ring-2 ring-primary/30">
+            {/* eslint-disable-next-line @next/next/no-img-element -- brand logo */}
+            <img src="/logo.png" alt="" className="relative z-10 h-3/4 w-3/4 object-contain" />
           </div>
         </div>
 

@@ -8,7 +8,8 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from agency.api.deps import DbSession
+from agency.api.deps import CurrentUser, DbSession
+from agency.api.ownership import require_owned_project, require_owned_task
 from agency.db.models import Task
 from agency.schemas.task import (
     TaskBoardRow,
@@ -18,17 +19,16 @@ from agency.schemas.task import (
     TaskOut,
     TaskUpdate,
 )
-from agency.services.projects import project_service
 from agency.services.tasks import task_service
 
 router = APIRouter(tags=["tasks"])
 
 
 @router.post("/projects/{project_id}/tasks", response_model=TaskOut, status_code=201)
-async def create_task(project_id: UUID, payload: TaskCreate, session: DbSession) -> TaskOut:
-    project = await project_service.get(session, project_id)
-    if project is None:
-        raise HTTPException(404, "project not found")
+async def create_task(
+    project_id: UUID, payload: TaskCreate, session: DbSession, user: CurrentUser
+) -> TaskOut:
+    await require_owned_project(session, project_id, user)
     task = await task_service.create(
         session,
         project_id=project_id,
@@ -54,10 +54,14 @@ async def create_task(project_id: UUID, payload: TaskCreate, session: DbSession)
 @router.get("/tasks", response_model=list[TaskOut])
 async def list_tasks(
     session: DbSession,
+    user: CurrentUser,
     project_id: UUID | None = None,
     status: str | None = None,
     owner: str | None = None,
 ) -> list[TaskOut]:
+    if project_id is None:
+        raise HTTPException(400, "project_id is required")
+    await require_owned_project(session, project_id, user)
     tasks = await task_service.list_tasks(
         session, project_id=project_id, status=status, owner=owner
     )
@@ -65,15 +69,16 @@ async def list_tasks(
 
 
 @router.get("/tasks/{task_id}", response_model=TaskOut)
-async def get_task(task_id: UUID, session: DbSession) -> TaskOut:
-    task = await task_service.get(session, task_id)
-    if task is None:
-        raise HTTPException(404, "task not found")
+async def get_task(task_id: UUID, session: DbSession, user: CurrentUser) -> TaskOut:
+    task = await require_owned_task(session, task_id, user)
     return TaskOut.model_validate(task)
 
 
 @router.patch("/tasks/{task_id}", response_model=TaskOut)
-async def update_task(task_id: UUID, payload: TaskUpdate, session: DbSession) -> TaskOut:
+async def update_task(
+    task_id: UUID, payload: TaskUpdate, session: DbSession, user: CurrentUser
+) -> TaskOut:
+    await require_owned_task(session, task_id, user)
     try:
         task = await task_service.update(
             session, task_id, fields=payload.model_dump(exclude_unset=True), actor="human"
@@ -87,10 +92,10 @@ async def update_task(task_id: UUID, payload: TaskUpdate, session: DbSession) ->
 
 
 @router.post("/tasks/{task_id}/comments", response_model=TaskCommentOut, status_code=201)
-async def add_comment(task_id: UUID, payload: TaskCommentIn, session: DbSession) -> TaskCommentOut:
-    task = await task_service.get(session, task_id)
-    if task is None:
-        raise HTTPException(404, "task not found")
+async def add_comment(
+    task_id: UUID, payload: TaskCommentIn, session: DbSession, user: CurrentUser
+) -> TaskCommentOut:
+    await require_owned_task(session, task_id, user)
     comment = await task_service.add_comment(
         session, task_id=task_id, author=payload.author, body=payload.body
     )
@@ -99,10 +104,10 @@ async def add_comment(task_id: UUID, payload: TaskCommentIn, session: DbSession)
 
 
 @router.get("/projects/{project_id}/board", response_model=list[TaskBoardRow])
-async def task_board(project_id: UUID, session: DbSession) -> list[TaskBoardRow]:
-    project = await project_service.get(session, project_id)
-    if project is None:
-        raise HTTPException(404, "project not found")
+async def task_board(
+    project_id: UUID, session: DbSession, user: CurrentUser
+) -> list[TaskBoardRow]:
+    await require_owned_project(session, project_id, user)
     tasks = await task_service.list_tasks(session, project_id=project_id)
     rows = []
     for task in tasks:

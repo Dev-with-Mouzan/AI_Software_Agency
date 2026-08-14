@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from agency.agents.registry import get_registry
-from agency.api.deps import DbSession
+from agency.api.deps import CurrentUser, DbSession
 from agency.memory.manager import memory_manager
 from agency.schemas.agent import (
     AgentMemoryWrite,
@@ -23,6 +23,7 @@ MAX_WRITE_LENGTH = 20_000
 @router.get("", response_model=list[MemoryEntryOut])
 async def list_memory(
     session: DbSession,
+    user: CurrentUser,
     agent_kind: str | None = None,
     scope_type: str | None = None,
     scope_id: str | None = None,
@@ -39,7 +40,9 @@ async def list_memory(
 
 
 @router.post("", response_model=MemoryEntryOut, status_code=201)
-async def write_memory(payload: AgentMemoryWrite, session: DbSession) -> MemoryEntryOut:
+async def write_memory(
+    payload: AgentMemoryWrite, session: DbSession, user: CurrentUser
+) -> MemoryEntryOut:
     registry = get_registry()
     if registry.get(payload.agent_kind) is None:
         raise HTTPException(404, f"unknown agent kind: {payload.agent_kind}")
@@ -59,7 +62,9 @@ async def write_memory(payload: AgentMemoryWrite, session: DbSession) -> MemoryE
 
 
 @router.post("/search", response_model=MemorySearchResponse)
-async def search_memory(payload: MemorySearchRequest, session: DbSession) -> MemorySearchResponse:
+async def search_memory(
+    payload: MemorySearchRequest, session: DbSession, user: CurrentUser
+) -> MemorySearchResponse:
     results = await memory_manager.search(
         session,
         payload.query,

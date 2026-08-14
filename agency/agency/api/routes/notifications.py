@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from agency.api.deps import DbSession
+from agency.api.deps import CurrentUser, DbSession
 from agency.db.models import Notification
 from agency.schemas.agent import NotificationOut
 
@@ -16,9 +16,16 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 @router.get("", response_model=list[NotificationOut])
 async def list_notifications(
-    session: DbSession, unread_only: bool = False
+    session: DbSession,
+    user: CurrentUser,
+    unread_only: bool = False,
 ) -> list[NotificationOut]:
-    stmt = select(Notification).order_by(Notification.created_at.desc()).limit(100)
+    stmt = (
+        select(Notification)
+        .where(Notification.recipient.in_([str(user.id), "human"]))
+        .order_by(Notification.created_at.desc())
+        .limit(100)
+    )
     if unread_only:
         stmt = stmt.where(Notification.read == False)  # noqa: E712
     rows = list((await session.scalars(stmt)).all())
@@ -26,10 +33,14 @@ async def list_notifications(
 
 
 @router.post("/{notification_id}/read", response_model=NotificationOut)
-async def mark_read(notification_id: UUID, session: DbSession) -> NotificationOut:
+async def mark_read(
+    notification_id: UUID, session: DbSession, user: CurrentUser
+) -> NotificationOut:
     notification = await session.get(Notification, notification_id)
     if notification is None:
         raise HTTPException(404, "notification not found")
+    if notification.recipient not in (str(user.id), "human"):
+        raise HTTPException(403, "you do not have access to this notification")
     notification.read = True
     await session.commit()
     return NotificationOut.model_validate(notification)

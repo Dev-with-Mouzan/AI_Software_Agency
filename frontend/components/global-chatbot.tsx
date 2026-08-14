@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input, Select } from "@/components/ui/input";
 import { useChat, useProjects } from "@/lib/hooks";
+import { useAuth } from "@/lib/auth-context";
 import type { ChatResponse } from "@/lib/types";
 import { humanizeChatReply } from "@/lib/chat";
 import { timeAgo } from "@/lib/format";
@@ -42,10 +43,11 @@ const WELCOME: Message = {
 
 export function GlobalChatbot() {
   const pathname = usePathname();
-  const hidden = pathname.startsWith("/chat");
+  const hidden = pathname.startsWith("/chat") || pathname.startsWith("/auth");
 
   const projects = useProjects();
   const chat = useChat();
+  const { requireAuth } = useAuth();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [input, setInput] = useState("");
@@ -62,6 +64,7 @@ export function GlobalChatbot() {
 
   const send = (event: React.FormEvent) => {
     event.preventDefault();
+    if (!requireAuth()) return;
     const text = input.trim();
     if (!text) return;
 

@@ -1,8 +1,14 @@
 <div align="center">
 
+<img src="frontend/public/logo.png" alt="DevPilot AI" width="88" height="88" style="background-color:#ffffff; border-radius:12px; padding:8px;" />
+
+<br />
+
 <img src="assets/banner.svg" alt="DevPilot AI banner" />
 
-**DevPilot AI — a multi-agent software studio where specialized AI employees plan, build, review and ship real projects — on your command, under human supervision.**
+<br />
+
+**A multi-agent software studio where specialized AI employees plan, build, review and ship real projects — on your command, under human supervision.**
 
 <br />
 
@@ -33,6 +39,7 @@
 - [🧪 Development & testing](#-development--testing)
 - [🌍 Deployment](#-deployment)
 - [📚 API reference](#-api-reference)
+- [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 
 ---
@@ -138,6 +145,8 @@ DEEPSEEK_API_KEY=sk-...
 # or: OPENAI_API_KEY=..., ANTHROPIC_API_KEY=..., GEMINI_API_KEY=..., QWEN_API_KEY=...
 ```
 
+> To enable email verification, also set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` and `SMTP_FROM` (see [Configuration](#️-configuration)). In non-production environments the code is returned in the API response instead, so sign-up works without SMTP.
+
 ### 3 · Run
 
 ```bash
@@ -165,6 +174,13 @@ All backend settings are loaded from environment variables / `.env` via pydantic
 | Variable | Default | Description |
 |---|---|---|
 | `API_TOKEN` | — | Shared bearer token (required in production) |
+| `JWT_SECRET` | — | Signing secret for access/refresh tokens (required in production) |
+| `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL_DAYS` | `900` / `14` | Token lifetimes in seconds / days |
+| `GOOGLE_CLIENT_ID` | — | Google OAuth client ID (blank disables Google login) |
+| `SMTP_HOST` / `SMTP_PORT` | `smtp.resend.com` / `587` | SMTP server for verification emails (`465` for implicit SSL) |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | `resend` / — | SMTP credentials — use your Resend API key as the password |
+| `SMTP_FROM` / `SMTP_FROM_NAME` | — / `DevPilot AI` | Sender address / display name. The domain must be verified with your provider |
+| `VERIFICATION_CODE_TTL_MINUTES` | `15` | Minutes a sign-up verification code stays valid |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./agency_dev.db` | Async DB URL (PostgreSQL via asyncpg supported) |
 | `WORKING_AREA` | `./working-area` | Where the agents build projects |
 | `LLM_PROVIDER` | `null` | `openai` · `anthropic` · `gemini` · `ollama` · `deepseek` |
@@ -179,7 +195,9 @@ All backend settings are loaded from environment variables / `.env` via pydantic
 | `ENABLE_GIT_CHECKPOINTS` | `true` | Auto-commit each workflow stage |
 | `API_CORS_ORIGINS` | `["http://localhost:3000"]` | Allowed dashboard origins |
 
-Frontend: set `AGENCY_API_URL` (backend base URL) and `API_TOKEN` in `frontend/.env` — the `/api/proxy` route forwards and authenticates requests.
+**Email verification.** Sign-ups are blocked until the emailed code is verified. In production the API refuses to send codes until `SMTP_HOST` and `SMTP_FROM` are set. A full example lives in `deployment/aws-ec2/.env.example`.
+
+**Frontend.** Set `AGENCY_API_URL` (backend base URL) and `API_TOKEN` in `frontend/.env` — the `/api/proxy` route forwards and authenticates requests.
 
 ---
 
@@ -262,6 +280,22 @@ Key resources: `projects` · `workspace` · `tasks` · `agents` · `workflows` �
 
 ---
 
-## 📄 License
+## 🤝 Contributing
 
-Released under the [MIT License](LICENSE). Copyright © 2026 DevPilot AI.
+Contributions are welcome — bug reports, feature ideas and pull requests all help.
+
+1. Fork the repository and create a feature branch.
+2. Keep changes focused and documented; add or update tests where behavior changes.
+3. Run the quality gates before submitting:
+
+```bash
+make lint          # ruff check + format
+make typecheck     # mypy on the backend
+make test          # pytest suite
+npm run lint       # frontend ESLint (in frontend/)
+```
+
+Open a pull request describing what changed and why. For larger features, open an issue first so the work can be discussed.
+
+---
+

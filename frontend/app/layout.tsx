@@ -8,6 +8,7 @@ import { GlobalChatbot } from "@/components/global-chatbot";
 import { GuidedTour } from "@/components/tour/guided-tour";
 import { ToastProvider } from "@/components/ui/toast";
 import { AppMain } from "@/components/motion/app-main";
+import { RouteGuard } from "@/components/auth/route-guard";
 
 import "./globals.css";
 
@@ -15,6 +16,10 @@ export const metadata: Metadata = {
   title: "DevPilot AI — AI software studio",
   description:
     "Command center for the multi-agent software studio. Projects, your team, runs, deployments.",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+  },
 };
 
 const themeScript = `(function(){try{var t=localStorage.getItem('agency-theme');if(t==='light'){document.documentElement.classList.add('light')}}catch(e){}})();`;
@@ -36,7 +41,9 @@ export default function RootLayout({
           <ThemeProvider>
             <ToastProvider>
               <SiteNavbar />
-              <AppMain>{children}</AppMain>
+              <RouteGuard>
+                <AppMain>{children}</AppMain>
+              </RouteGuard>
               <SiteFooter />
               <GlobalChatbot />
               <GuidedTour />

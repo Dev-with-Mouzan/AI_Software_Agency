@@ -8,10 +8,11 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from agency.api.deps import DbSession
+from agency.api.deps import CurrentUser, DbSession
+from agency.api.ownership import require_owned_deployment, require_owned_project
 from agency.api.routes.agents import _spawn_background
 from agency.api.routes.workflows import serialize_workflow_run
-from agency.db.models import Deployment
+from agency.db.models import Deployment, Project
 from agency.deployments import get_provider
 from agency.schemas.deployment import (
     DeployLaunchOut,
@@ -29,7 +30,6 @@ from agency.services.deployment import (
     ProviderNotConfigured,
     deployment_service,
 )
-from agency.services.projects import project_service
 from agency.workflows.orchestrator import workflow_orchestrator
 
 router = APIRouter(tags=["deployment"])
@@ -44,18 +44,15 @@ def _normalize_domain(domain: str) -> str:
     return domain
 
 
-async def _project_or_404(project_id: UUID, session: DbSession):
-    project = await project_service.get(session, project_id)
-    if project is None:
-        raise HTTPException(404, "project not found")
-    return project
+async def _project_or_404(project_id: UUID, session: DbSession, user) -> Project:
+    return await require_owned_project(session, project_id, user)
 
 
 @router.get("/projects/{project_id}/deployments/validate", response_model=DeploymentValidateOut)
-async def validate_deployment(project_id: UUID, session: DbSession) -> DeploymentValidateOut:
-    project = await project_service.get(session, project_id)
-    if project is None:
-        raise HTTPException(404, "project not found")
+async def validate_deployment(
+    project_id: UUID, session: DbSession, user: CurrentUser
+) -> DeploymentValidateOut:
+    project = await require_owned_project(session, project_id, user)
     checks = await deployment_service.validate(session, project)
     check_map = {c.name: c for c in checks}
     return DeploymentValidateOut(
@@ -75,11 +72,9 @@ async def validate_deployment(project_id: UUID, session: DbSession) -> Deploymen
 
 @router.post("/projects/{project_id}/deployments", response_model=DeploymentOut, status_code=201)
 async def run_deployment(
-    project_id: UUID, payload: DeploymentRunRequest, session: DbSession
+    project_id: UUID, payload: DeploymentRunRequest, session: DbSession, user: CurrentUser
 ) -> DeploymentOut:
-    project = await project_service.get(session, project_id)
-    if project is None:
-        raise HTTPException(404, "project not found")
+    project = await require_owned_project(session, project_id, user)
     deployment = await deployment_service.run(
         session,
         project,
@@ -92,7 +87,10 @@ async def run_deployment(
 
 
 @router.get("/projects/{project_id}/deployments", response_model=list[DeploymentOut])
-async def list_deployments(project_id: UUID, session: DbSession) -> list[DeploymentOut]:
+async def list_deployments(
+    project_id: UUID, session: DbSession, user: CurrentUser
+) -> list[DeploymentOut]:
+    await require_owned_project(session, project_id, user)
     rows = list(
         (
             await session.scalars(
@@ -107,8 +105,12 @@ async def list_deployments(project_id: UUID, session: DbSession) -> list[Deploym
 
 @router.post("/deployments/{deployment_id}/approve", response_model=DeploymentOut)
 async def approve_deployment(
-    deployment_id: UUID, payload: DeploymentApproveRequest, session: DbSession
+    deployment_id: UUID,
+    payload: DeploymentApproveRequest,
+    session: DbSession,
+    user: CurrentUser,
 ) -> DeploymentOut:
+    await require_owned_deployment(session, deployment_id, user)
     deployment = await deployment_service.approve(
         session,
         deployment_id,
@@ -120,7 +122,10 @@ async def approve_deployment(
 
 
 @router.post("/deployments/{deployment_id}/execute", response_model=DeploymentOut)
-async def execute_deployment(deployment_id: UUID, session: DbSession) -> DeploymentOut:
+async def execute_deployment(
+    deployment_id: UUID, session: DbSession, user: CurrentUser
+) -> DeploymentOut:
+    await require_owned_deployment(session, deployment_id, user)
     try:
         deployment = await deployment_service.execute(session, deployment_id, actor="human")
     except ValueError as exc:
@@ -132,16 +137,18 @@ async def execute_deployment(deployment_id: UUID, session: DbSession) -> Deploym
 
 
 @router.get("/projects/{project_id}/deploy/options", response_model=DeploymentOptionsOut)
-async def deploy_options(project_id: UUID, session: DbSession) -> DeploymentOptionsOut:
-    project = await _project_or_404(project_id, session)
+async def deploy_options(
+    project_id: UUID, session: DbSession, user: CurrentUser
+) -> DeploymentOptionsOut:
+    project = await _project_or_404(project_id, session, user)
     return DeploymentOptionsOut(**await deployment_service.options(session, project))
 
 
 @router.post("/projects/{project_id}/deploy", response_model=DeployLaunchOut, status_code=201)
 async def deploy_project(
-    project_id: UUID, payload: DeployRequest, session: DbSession
+    project_id: UUID, payload: DeployRequest, session: DbSession, user: CurrentUser
 ) -> DeployLaunchOut:
-    project = await _project_or_404(project_id, session)
+    project = await _project_or_404(project_id, session, user)
     provider = get_provider(payload.provider)
     if provider is None:
         raise HTTPException(422, f"unknown deployment provider: {payload.provider}")
@@ -172,8 +179,10 @@ async def deploy_project(
 
 
 @router.get("/projects/{project_id}/deployment", response_model=DeploymentOut | None)
-async def latest_deployment(project_id: UUID, session: DbSession) -> DeploymentOut | None:
-    project = await _project_or_404(project_id, session)
+async def latest_deployment(
+    project_id: UUID, session: DbSession, user: CurrentUser
+) -> DeploymentOut | None:
+    project = await _project_or_404(project_id, session, user)
     deployment = await deployment_service.status(session, project.id)
     if deployment is None:
         return None
@@ -181,14 +190,18 @@ async def latest_deployment(project_id: UUID, session: DbSession) -> DeploymentO
 
 
 @router.get("/projects/{project_id}/deployment/logs", response_model=DeploymentLogOut)
-async def deployment_logs(project_id: UUID, session: DbSession) -> DeploymentLogOut:
-    project = await _project_or_404(project_id, session)
+async def deployment_logs(
+    project_id: UUID, session: DbSession, user: CurrentUser
+) -> DeploymentLogOut:
+    project = await _project_or_404(project_id, session, user)
     return DeploymentLogOut(**await deployment_service.logs(session, project))
 
 
 @router.post("/projects/{project_id}/redeploy", response_model=DeployLaunchOut, status_code=201)
-async def redeploy_project(project_id: UUID, session: DbSession) -> DeployLaunchOut:
-    project = await _project_or_404(project_id, session)
+async def redeploy_project(
+    project_id: UUID, session: DbSession, user: CurrentUser
+) -> DeployLaunchOut:
+    project = await _project_or_404(project_id, session, user)
     try:
         deployment, run = await deployment_service.redeploy(session, project)
     except ValueError as exc:
@@ -201,8 +214,10 @@ async def redeploy_project(project_id: UUID, session: DbSession) -> DeployLaunch
 
 
 @router.delete("/projects/{project_id}/deployment", response_model=DeploymentOut)
-async def remove_deployment(project_id: UUID, session: DbSession) -> DeploymentOut:
-    project = await _project_or_404(project_id, session)
+async def remove_deployment(
+    project_id: UUID, session: DbSession, user: CurrentUser
+) -> DeploymentOut:
+    project = await _project_or_404(project_id, session, user)
     try:
         deployment = await deployment_service.remove(session, project)
     except ValueError as exc:
@@ -212,9 +227,9 @@ async def remove_deployment(project_id: UUID, session: DbSession) -> DeploymentO
 
 @router.post("/projects/{project_id}/domain", response_model=DomainOut)
 async def add_custom_domain(
-    project_id: UUID, payload: DomainRequest, session: DbSession
+    project_id: UUID, payload: DomainRequest, session: DbSession, user: CurrentUser
 ) -> DomainOut:
-    project = await _project_or_404(project_id, session)
+    project = await _project_or_404(project_id, session, user)
     domain = _normalize_domain(payload.domain)
     try:
         result = await deployment_service.add_domain(session, project, domain)
@@ -225,8 +240,10 @@ async def add_custom_domain(
 
 
 @router.post("/projects/{project_id}/domain/verify", response_model=DomainOut)
-async def verify_custom_domain(project_id: UUID, session: DbSession) -> DomainOut:
-    project = await _project_or_404(project_id, session)
+async def verify_custom_domain(
+    project_id: UUID, session: DbSession, user: CurrentUser
+) -> DomainOut:
+    project = await _project_or_404(project_id, session, user)
     try:
         result = await deployment_service.check_domain(session, project)
     except (ValueError, ProviderNotConfigured) as exc:

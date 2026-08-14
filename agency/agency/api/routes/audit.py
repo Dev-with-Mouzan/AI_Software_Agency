@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 from sqlalchemy import select
 
-from agency.api.deps import DbSession
+from agency.api.deps import CurrentUser, DbSession
 from agency.db.models import AuditLog
 from agency.schemas.agent import AuditLogOut
 
@@ -15,6 +15,7 @@ router = APIRouter(prefix="/audit", tags=["audit"])
 @router.get("", response_model=list[AuditLogOut])
 async def list_audit(
     session: DbSession,
+    user: CurrentUser,
     actor: str | None = None,
     action: str | None = None,
     resource_type: str | None = None,

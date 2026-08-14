@@ -59,12 +59,45 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
     return _session_factory
 
 
+async def _add_missing_sqlite_columns(conn) -> None:
+    """Best-effort migrations for SQLite dev/test DBs.
+
+    `create_all` never alters existing tables, so columns added to the models
+    must be patched in-place. No-op on fresh databases (the column already
+    exists) and harmless on Postgres (guarded by dialect check).
+    """
+    if not get_settings().database_url.startswith("sqlite"):
+        return
+
+    def _columns(sync_conn, table: str) -> set[str]:
+        return {
+            row[1] for row in sync_conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
+        }
+
+    def _patch(sync_conn) -> None:
+        existing = _columns(sync_conn, "projects")
+        if existing and "owner_id" not in existing:
+            sync_conn.exec_driver_sql("ALTER TABLE projects ADD COLUMN owner_id VARCHAR(36)")
+
+        users = _columns(sync_conn, "users")
+        if users:
+            if "email_verified" not in users:
+                sync_conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT 0"
+                )
+            if "avatar_url" not in users:
+                sync_conn.exec_driver_sql("ALTER TABLE users ADD COLUMN avatar_url VARCHAR(300) DEFAULT ''")
+
+    await conn.run_sync(_patch)
+
+
 async def init_db() -> None:
     """Create all tables. In production use `alembic upgrade head` instead."""
     from agency.db import models  # noqa: F401  (register models)
 
     async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _add_missing_sqlite_columns(conn)
 
 
 async def dispose_engine() -> None:

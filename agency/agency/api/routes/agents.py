@@ -7,11 +7,11 @@ import asyncio
 from fastapi import APIRouter, HTTPException
 
 from agency.agents.registry import get_registry
-from agency.api.deps import DbSession
+from agency.api.deps import CurrentUser, DbSession
+from agency.api.ownership import require_owned_project
 from agency.api.routes.workflows import serialize_workflow_run
 from agency.schemas.agent import AgentOut, AgentRunRequest, AgentRuntimeOut
 from agency.schemas.workflow import WorkflowRunOut
-from agency.services.projects import project_service
 from agency.workflows.engine import WorkflowError
 from agency.workflows.orchestrator import OrchestrationError, workflow_orchestrator
 
@@ -29,17 +29,18 @@ def _spawn_background(coro) -> None:
 
 
 @router.post("/run", response_model=WorkflowRunOut, status_code=201)
-async def run_agents(payload: AgentRunRequest, session: DbSession) -> WorkflowRunOut:
+async def run_agents(
+    payload: AgentRunRequest, session: DbSession, user: CurrentUser
+) -> WorkflowRunOut:
     """Dispatch a set of agents; the orchestrator controls the whole workflow.
 
     The run is created and returned immediately in RUNNING state; the
     orchestrated pipeline (planning, implementation, review loop, deployment)
     executes in the background so the UI can stream live activity.
     """
-    if payload.project_id:
-        project = await project_service.get(session, payload.project_id)
-        if project is None:
-            raise HTTPException(404, "project not found")
+    if payload.project_id is None:
+        raise HTTPException(400, "project_id is required")
+    await require_owned_project(session, payload.project_id, user)
     try:
         run = await workflow_orchestrator.prepare(
             session,

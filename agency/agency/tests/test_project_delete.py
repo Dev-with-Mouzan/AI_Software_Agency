@@ -72,5 +72,10 @@ async def test_delete_removes_workflow_runs(client, db) -> None:
     resp = await client.delete(f"/api/projects/{proj['id']}")
     assert resp.status_code == 204, resp.text
 
-    runs = (await client.get(f"/api/workflows?project_id={proj['id']}")).json()
+    # Project is gone, so the project-scoped run listing is either empty or a 404.
+    runs_resp = await client.get(f"/api/workflows?project_id={proj['id']}")
+    if runs_resp.status_code == 404:
+        return
+    runs = runs_resp.json()
+    assert isinstance(runs, list)
     assert run.id not in [r["id"] for r in runs]

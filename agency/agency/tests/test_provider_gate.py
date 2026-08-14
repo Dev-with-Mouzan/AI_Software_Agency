@@ -56,7 +56,9 @@ def test_ensure_api_configured_allows_offline_only_in_test_env(monkeypatch) -> N
     ensure_api_configured()  # must not raise in the explicit test environment
 
 
-async def test_api_agents_run_returns_503_when_no_provider(client, monkeypatch) -> None:
+async def test_api_agents_run_returns_503_when_no_provider(
+    client, project, monkeypatch
+) -> None:
     _gate(monkeypatch)
     monkeypatch.setattr(settings_service, "any_provider_configured", lambda: False)
     monkeypatch.setattr(settings_service, "get_settings", lambda: _FakeSettings())
@@ -64,6 +66,7 @@ async def test_api_agents_run_returns_503_when_no_provider(client, monkeypatch) 
     resp = await client.post(
         "/api/agents/run",
         json={
+            "project_id": str(project.id),
             "agents": ["planner", "backend_engineer"],
             "command": "Build a REST API",
             "plan_source": "agent",

@@ -72,8 +72,48 @@ async def db():
 
 
 @pytest_asyncio.fixture
-async def client():
-    """HTTP client against the FastAPI app (lifespan ran manually)."""
+async def user(db):
+    """A registered user that owns the authed test client's projects."""
+    from agency.db.models import User
+    from agency.security import hash_password
+
+    u = User(
+        email="tester@devpilot.ai",
+        name="Test User",
+        password_hash=hash_password("password123"),
+        email_verified=True,
+    )
+    db.add(u)
+    await db.commit()
+    await db.refresh(u)
+    return u
+
+
+@pytest_asyncio.fixture
+async def client(user):
+    """HTTP client against the FastAPI app, authenticated as `user`."""
+    from agency.api.main import app
+    from agency.security import create_access_token
+
+    await init_db()
+    from agency.agents.registry import get_registry
+
+    async with get_session_factory()() as session:
+        await get_registry().seed(session)
+
+    access = create_access_token(str(user.id))
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {access}"},
+    ) as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture
+async def client_noauth():
+    """HTTP client against the FastAPI app with no credentials (guest)."""
     from agency.api.main import app
 
     await init_db()
@@ -88,9 +128,11 @@ async def client():
 
 
 @pytest_asyncio.fixture
-async def project(db):
+async def project(db, user):
     from agency.services.projects import project_service
 
-    p = await project_service.create(db, name="Test Project", description="integration")
+    p = await project_service.create(
+        db, name="Test Project", description="integration", owner_id=user.id
+    )
     await db.commit()
     return p

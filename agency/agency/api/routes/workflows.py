@@ -7,7 +7,8 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
-from agency.api.deps import DbSession
+from agency.api.deps import CurrentUser, DbSession
+from agency.api.ownership import require_owned_project, require_owned_workflow_run
 from agency.db.models import WorkflowRun, WorkflowStep
 from agency.observability.activity import (
     ActivityEvent,
@@ -20,6 +21,7 @@ from agency.schemas.workflow import (
     WorkflowRunOut,
     WorkflowStepOut,
 )
+from agency.services.projects import project_service
 from agency.workflows.engine import WorkflowError, workflow_engine
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
@@ -138,31 +140,44 @@ _run_out = serialize_workflow_run
 
 @router.get("", response_model=list[WorkflowRunOut])
 async def list_workflows(
-    session: DbSession, project_id: UUID | None = None
+    session: DbSession,
+    user: CurrentUser,
+    project_id: UUID | None = None,
 ) -> list[WorkflowRunOut]:
-    stmt = select(WorkflowRun).order_by(WorkflowRun.created_at.desc()).limit(100)
-    if project_id:
-        stmt = stmt.where(WorkflowRun.project_id == project_id)
+    if project_id is not None:
+        await require_owned_project(session, project_id, user)
+        stmt = (
+            select(WorkflowRun)
+            .where(WorkflowRun.project_id == project_id)
+            .order_by(WorkflowRun.created_at.desc())
+            .limit(100)
+        )
+    else:
+        # No project filter: only runs belonging to the user's own projects.
+        owned = await project_service.list(session, owner_id=user.id)
+        project_ids = [p.id for p in owned]
+        stmt = (
+            select(WorkflowRun)
+            .where(WorkflowRun.project_id.in_(project_ids))
+            .order_by(WorkflowRun.created_at.desc())
+            .limit(100)
+        )
     runs = list((await session.scalars(stmt)).all())
     return [await _run_out(session, r) for r in runs]
 
 
 @router.get("/{run_id}", response_model=WorkflowRunOut)
-async def get_workflow(run_id: UUID, session: DbSession) -> WorkflowRunOut:
-    run = await session.get(WorkflowRun, run_id)
-    if run is None:
-        raise HTTPException(404, "workflow run not found")
+async def get_workflow(run_id: UUID, session: DbSession, user: CurrentUser) -> WorkflowRunOut:
+    run = await require_owned_workflow_run(session, run_id, user)
     return await _run_out(session, run)
 
 
 @router.get("/{run_id}/activity", response_model=WorkflowActivityPage)
 async def get_workflow_activity(
-    run_id: UUID, session: DbSession, after: int = 0
+    run_id: UUID, session: DbSession, user: CurrentUser, after: int = 0
 ) -> WorkflowActivityPage:
     """Live activity feed for a run. Fast-polled by the dispatch UI."""
-    run = await session.get(WorkflowRun, run_id)
-    if run is None:
-        raise HTTPException(404, "workflow run not found")
+    run = await require_owned_workflow_run(session, run_id, user)
 
     events = activity_store.since(run_id, after)
     if not events:
@@ -187,8 +202,12 @@ async def get_workflow_activity(
 
 @router.post("/{run_id}/approve", response_model=WorkflowRunOut)
 async def approve_workflow(
-    run_id: UUID, payload: WorkflowApproveRequest, session: DbSession
+    run_id: UUID,
+    payload: WorkflowApproveRequest,
+    session: DbSession,
+    user: CurrentUser,
 ) -> WorkflowRunOut:
+    await require_owned_workflow_run(session, run_id, user)
     try:
         run = await workflow_engine.approve(
             session,

@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BadgeCheck,
+  Camera,
   Check,
   CheckCircle2,
   Eye,
@@ -14,6 +16,7 @@ import {
   RotateCcw,
   ShieldAlert,
   Trash2,
+  UserCircle2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +25,7 @@ import { Input, Field, Select } from "@/components/ui/input";
 import { PageLoader } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
 import { useToast } from "@/components/ui/toast";
+import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/cn";
 import { useLlmSettings, useUpdateLlmSettings, useTestProvider } from "@/lib/hooks";
 import { TOURS, resetTour } from "@/lib/tours";
@@ -73,6 +77,153 @@ const emptyDraft = (): ProviderDraft => ({
   clear_key: false,
   show_key: false,
 });
+
+function ProfileCard() {
+  const { user, avatarUrl, updateProfile } = useAuth();
+  const toast = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [name, setName] = useState("");
+  const [stagedAvatar, setStagedAvatar] = useState<string | null>(null);
+  const [removeAvatar, setRemoveAvatar] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) setName(user.name);
+  }, [user]);
+
+  const preview = stagedAvatar ?? (removeAvatar ? null : avatarUrl);
+  const hasPhoto = !!preview;
+
+  const pickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.push("Please choose an image file.", "error");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.push("Images must be 2 MB or smaller.", "error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setStagedAvatar(reader.result as string);
+      setRemoveAvatar(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const saveProfile = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      await updateProfile({
+        name: name.trim(),
+        avatar: removeAvatar ? null : stagedAvatar ?? undefined,
+      });
+      setStagedAvatar(null);
+      setRemoveAvatar(false);
+      toast.push("Profile updated.", "success");
+    } catch (err) {
+      toast.push(
+        err instanceof Error ? err.message : "Failed to update your profile.",
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card data-tour="settings-profile">
+      <CardHeader>
+        <div>
+          <CardTitle>Profile</CardTitle>
+          <p className="mt-0.5 text-xs text-muted">
+            Your name and avatar appear in the navigation bar.
+          </p>
+        </div>
+      </CardHeader>
+      <CardBody className="flex flex-col gap-5 sm:flex-row sm:items-start">
+        <div className="relative shrink-0">
+          <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-edge bg-surface-2 text-text-dim">
+            {preview ? (
+              // eslint-disable-next-line @next/next/no-img-element -- avatars come from the API proxy at runtime
+              <img
+                src={preview}
+                alt="Profile avatar"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <UserCircle2 className="h-10 w-10" aria-hidden />
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            aria-label="Upload a profile photo"
+            className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border border-edge bg-surface text-primary shadow-sm transition-colors hover:bg-surface-2"
+          >
+            <Camera className="h-4 w-4" aria-hidden />
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={pickFile}
+          />
+        </div>
+
+        <div className="flex w-full flex-col gap-3.5">
+          <Field label="Name" htmlFor="profile-name">
+            <Input
+              id="profile-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              autoComplete="name"
+            />
+          </Field>
+
+          <Field label="Email">
+            <div className="flex items-center gap-2 rounded-lg border border-edge bg-surface-2/50 px-3.5 py-2 text-sm text-muted">
+              <span className="min-w-0 flex-1 truncate">{user?.email}</span>
+              {user?.email_verified ? (
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-success">
+                  <BadgeCheck className="h-3 w-3" aria-hidden /> Verified
+                </span>
+              ) : (
+                <span className="shrink-0 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-warning">
+                  Unverified
+                </span>
+              )}
+            </div>
+          </Field>
+
+          <div className="flex items-center gap-2">
+            <Button onClick={() => void saveProfile()} loading={saving}>
+              <Check className="h-4 w-4" aria-hidden /> Save profile
+            </Button>
+            {hasPhoto && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setStagedAvatar(null);
+                  setRemoveAvatar(true);
+                }}
+                disabled={saving}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden /> Remove photo
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -230,6 +381,8 @@ export default function SettingsPage() {
         title="Settings"
         description="Connect an AI provider and tell DevPilot which models each specialist should use. Keys stay on your machine."
       />
+
+      <ProfileCard />
 
       {/* Status strip */}
       <div

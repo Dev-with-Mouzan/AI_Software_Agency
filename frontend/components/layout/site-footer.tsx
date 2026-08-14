@@ -1,7 +1,10 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+
 import Link from "next/link";
 import {
   ArrowUp,
-  Bot,
   Github,
   Globe,
   Mail,
@@ -33,7 +36,10 @@ const FOOT_LINKS: { href: string; label: string }[] = [
 ];
 
 export function SiteFooter() {
+  const pathname = usePathname();
   const year = new Date().getFullYear();
+
+  if (pathname.startsWith("/auth")) return null;
 
   return (
     <footer className="relative z-10 mt-24 overflow-hidden border-t border-edge bg-surface/40">
@@ -57,11 +63,9 @@ export function SiteFooter() {
           {/* Brand */}
           <div className="max-w-sm">
             <Link href="/" className="flex items-center gap-2.5" aria-label="DevPilot AI home">
-              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/30">
-                <Bot className="h-[18px] w-[18px] text-primary" aria-hidden />
-                <span className="absolute -right-px -top-px h-2 w-2 rounded-full bg-primary">
-                  <span className="absolute inset-0 animate-ping-slow rounded-full bg-primary" />
-                </span>
+              <span className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-primary/30">
+                {/* eslint-disable-next-line @next/next/no-img-element -- brand logo */}
+                <img src="/logo.png" alt="" className="h-full w-full object-contain" />
               </span>
               <span className="leading-tight">
                 <span className="block font-display text-[15px] font-bold tracking-tight text-text">

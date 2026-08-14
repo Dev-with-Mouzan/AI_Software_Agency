@@ -3,6 +3,7 @@
 from agency.api.routes import (
     agents,
     audit,
+    auth,
     chat,
     deployment,
     health,
@@ -18,6 +19,7 @@ from agency.api.routes import (
 __all__ = [
     "agents",
     "audit",
+    "auth",
     "chat",
     "deployment",
     "health",

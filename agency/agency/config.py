@@ -53,6 +53,31 @@ class Settings(BaseSettings):
     api_cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     api_token: str | None = None
 
+    # --- Auth ---
+    # Secret used to sign access-token JWTs. Override in .env; production
+    # refuses to start without a real secret (never the dev default).
+    jwt_secret: str = "devpilot-dev-insecure-secret-change-me"
+    jwt_access_ttl: int = 15 * 60  # seconds
+    jwt_refresh_ttl_days: int = 14
+    google_client_id: str = ""
+
+    # --- Email verification ---
+    # Verification codes are sent over SMTP (stdlib smtplib). Until SMTP is
+    # configured the code is logged and, outside production, returned to the
+    # caller (`dev_code`) so sign-ups stay testable.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_from_name: str = "DevPilot AI"
+    smtp_tls: bool = True
+    verification_code_ttl_minutes: int = 15
+    # Minimum seconds between two codes for the same address.
+    verification_resend_seconds: int = 60
+    # Failed attempts allowed against a single code before it is locked.
+    verification_max_attempts: int = 5
+
     # --- Database ---
     database_url: str = "sqlite+aiosqlite:///./agency_dev.db"
     database_echo: bool = False

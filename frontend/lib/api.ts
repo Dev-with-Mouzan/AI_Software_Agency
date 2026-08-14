@@ -1,7 +1,20 @@
+import { getAccessToken, refreshAccessToken } from "@/lib/auth-session";
+
 const API_URL = "/api/proxy";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const UPLOAD_TIMEOUT_MS = 120_000;
+
+/** Auth endpoints are public — never refresh-loop against them. */
+const PUBLIC_AUTH_PATHS = new Set([
+  "/auth/login",
+  "/auth/signup",
+  "/auth/refresh",
+  "/auth/google",
+  "/auth/send-code",
+  "/auth/verify-code",
+  "/auth/avatar",
+]);
 
 export class ApiClientError extends Error {
   status: number;
@@ -74,6 +87,8 @@ async function request<T>(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
+  const token = getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const { signal, done } = timeoutSignal(timeoutMs);
   let res: Response;
@@ -85,10 +100,32 @@ async function request<T>(
       signal,
     });
   } catch (err) {
-    throw requestError(err, path, timeoutMs);
-  } finally {
     done();
+    throw requestError(err, path, timeoutMs);
   }
+
+  // Access token expired — rotate the refresh token and retry exactly once.
+  if (res.status === 401 && token && !PUBLIC_AUTH_PATHS.has(path)) {
+    const fresh = await refreshAccessToken();
+    if (fresh) {
+      try {
+        res = await fetch(`${API_URL}${path}`, {
+          ...init,
+          headers: {
+            ...headers,
+            Authorization: `Bearer ${fresh}`,
+            ...(init?.headers ?? {}),
+          },
+          cache: "no-store",
+          signal,
+        });
+      } catch (err) {
+        done();
+        throw requestError(err, path, timeoutMs);
+      }
+    }
+  }
+  done();
 
   if (!res.ok) {
     let detail = `Request failed with status ${res.status}`;
@@ -141,19 +178,42 @@ export async function uploadFile<T>(
   form.append(field, file);
 
   const { signal, done } = timeoutSignal(UPLOAD_TIMEOUT_MS);
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       method: "POST",
       body: form,
+      headers,
       cache: "no-store",
       signal,
     });
   } catch (err) {
-    throw requestError(err, path, UPLOAD_TIMEOUT_MS);
-  } finally {
     done();
+    throw requestError(err, path, UPLOAD_TIMEOUT_MS);
   }
+
+  if (res.status === 401 && token && !PUBLIC_AUTH_PATHS.has(path)) {
+    const fresh = await refreshAccessToken();
+    if (fresh) {
+      try {
+        res = await fetch(`${API_URL}${path}`, {
+          method: "POST",
+          body: form,
+          headers: { Authorization: `Bearer ${fresh}` },
+          cache: "no-store",
+          signal,
+        });
+      } catch (err) {
+        done();
+        throw requestError(err, path, UPLOAD_TIMEOUT_MS);
+      }
+    }
+  }
+  done();
 
   if (!res.ok) {
     let detail = `Request failed with status ${res.status}`;
@@ -172,14 +232,37 @@ export async function uploadFile<T>(
 
 export async function fetchBlob(path: string): Promise<Blob> {
   const { signal, done } = timeoutSignal(UPLOAD_TIMEOUT_MS);
+  const headers: Record<string, string> = {};
+  const token = getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, { cache: "no-store", signal });
+    res = await fetch(`${API_URL}${path}`, {
+      headers,
+      cache: "no-store",
+      signal,
+    });
   } catch (err) {
-    throw requestError(err, path, UPLOAD_TIMEOUT_MS);
-  } finally {
     done();
+    throw requestError(err, path, UPLOAD_TIMEOUT_MS);
   }
+
+  if (res.status === 401 && token && !PUBLIC_AUTH_PATHS.has(path)) {
+    const fresh = await refreshAccessToken();
+    if (fresh) {
+      try {
+        res = await fetch(`${API_URL}${path}`, {
+          headers: { Authorization: `Bearer ${fresh}` },
+          cache: "no-store",
+          signal,
+        });
+      } catch (err) {
+        done();
+        throw requestError(err, path, UPLOAD_TIMEOUT_MS);
+      }
+    }
+  }
+  done();
 
   if (!res.ok) {
     let detail = `Request failed with status ${res.status}`;

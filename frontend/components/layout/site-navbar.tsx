@@ -8,11 +8,14 @@ import {
   Bot,
   FolderKanban,
   LayoutDashboard,
+  LogIn,
+  LogOut,
   Menu,
   Moon,
   ScrollText,
   Settings,
   Sun,
+  UserCircle2,
   Workflow,
   X,
   type LucideIcon,
@@ -20,6 +23,7 @@ import {
 
 import { cn } from "@/lib/cn";
 import { useHealth } from "@/lib/hooks";
+import { useAuth } from "@/lib/auth-context";
 
 interface NavItem {
   href: string;
@@ -107,6 +111,109 @@ function ScrollProgress() {
   );
 }
 
+function AuthMenu() {
+  const { status, user, avatarUrl, isAuthenticated, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  if (status === "loading") return null;
+
+  if (!isAuthenticated || !user) {
+    return (
+      <Link
+        href="/auth?mode=login"
+        className="flex h-9 items-center gap-1.5 rounded-full bg-primary px-3.5 text-[13px] font-semibold text-primary-ink transition-colors hover:bg-primary-hover hover:shadow-glow"
+      >
+        <LogIn className="h-3.5 w-3.5" aria-hidden />
+        <span className="hidden sm:inline">Sign in</span>
+      </Link>
+    );
+  }
+
+  return (
+    <div className="relative">
+      {/* Profile glow beacon */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -bottom-3 left-1/2 h-5 w-10 -translate-x-1/2 rounded-full bg-primary/35 blur-xl"
+      />
+      <motion.button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        whileTap={{ scale: 0.9 }}
+        aria-label="Account menu"
+        aria-expanded={open}
+        className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-edge bg-surface-2 text-text-dim transition-colors hover:border-primary/40"
+      >
+        <span
+          aria-hidden
+          className="absolute inset-x-1 bottom-0 h-1.5 rounded-full bg-primary/50 blur-md"
+        />
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- avatar served from the API proxy
+          <img src={avatarUrl} alt="" className="relative h-full w-full object-cover" />
+        ) : (
+          <UserCircle2 className="relative h-5 w-5" aria-hidden />
+        )}
+      </motion.button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              className="fixed inset-0 z-40"
+              onClick={() => setOpen(false)}
+              aria-hidden
+            />
+            <motion.div
+              initial={{ opacity: 0, y: -8, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.97 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              className="glass-strong absolute right-0 top-full z-50 mt-2 w-60 rounded-2xl border border-edge p-2 shadow-pop"
+            >
+              <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-edge bg-surface-2 text-text-dim">
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- avatar served from the API proxy
+                    <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <UserCircle2 className="h-5 w-5" aria-hidden />
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-semibold text-text">
+                    {user.name || "DevPilot user"}
+                  </p>
+                  <p className="truncate text-[11px] text-muted">{user.email}</p>
+                </div>
+              </div>
+              <div className="my-1 h-px bg-edge-soft" />
+              <Link
+                href="/settings"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-medium text-text-dim transition-colors hover:bg-surface-2 hover:text-text"
+              >
+                <Settings className="h-4 w-4" aria-hidden /> Settings
+              </Link>
+              <button
+                type="button"
+                onClick={() => void logout()}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[13px] font-medium text-text-dim transition-colors hover:bg-surface-2 hover:text-text"
+              >
+                <LogOut className="h-4 w-4" aria-hidden /> Sign out
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function SiteNavbar() {
   const pathname = usePathname();
   const health = useHealth(30_000);
@@ -132,6 +239,9 @@ export function SiteNavbar() {
   }, [pathname]);
 
   const isOnline = health.data?.status === "ok";
+
+  // The auth page is a focused screen — no navigation chrome.
+  if (pathname.startsWith("/auth")) return null;
 
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
@@ -159,14 +269,21 @@ export function SiteNavbar() {
         >
           {/* Brand */}
           <div className="flex shrink-0 items-center">
-            <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="DevPilot AI home">
-              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/30">
-                <Bot className="h-[18px] w-[18px] text-primary" aria-hidden />
-                <span className="absolute -right-px -top-px h-2 w-2 rounded-full bg-primary">
-                  <span className="absolute inset-0 animate-ping-slow rounded-full bg-primary" />
-                </span>
+            <Link href="/" className="relative flex shrink-0 items-center gap-2.5" aria-label="DevPilot AI home">
+              {/* Logo glow beacon */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute -bottom-3 left-0 h-6 w-full rounded-full bg-primary/30 blur-xl"
+              />
+              <span className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-primary/30">
+                <span
+                  aria-hidden
+                  className="absolute inset-x-0 bottom-0 h-2 rounded-full bg-primary/60 blur-sm"
+                />
+                {/* eslint-disable-next-line @next/next/no-img-element -- brand logo */}
+                <img src="/logo.png" alt="" className="relative h-full w-full object-contain" />
               </span>
-              <span className="leading-tight">
+              <span className="relative leading-tight">
                 <span className="block font-display text-[15px] font-bold tracking-tight text-text">
                   DevPilot AI
                 </span>
@@ -210,6 +327,8 @@ export function SiteNavbar() {
               </span>
               {isOnline ? "Online" : "Offline"}
             </span>
+
+            <AuthMenu />
 
             <motion.button
               type="button"

@@ -662,3 +662,18 @@
   animation: marquee-scroll 26s linear infinite !important;
   will-change: transform;
 }
+
+/* 3D project cube — slowly tumbles around a tilted vertical axis */
+@keyframes cube-spin {
+  0% {
+    transform: rotateX(-22deg) rotateY(0deg);
+  }
+  100% {
+    transform: rotateX(-22deg) rotateY(360deg);
+  }
+}
+
+.animate-cube-spin {
+  animation: cube-spin 26s linear infinite;
+  will-change: transform;
+}

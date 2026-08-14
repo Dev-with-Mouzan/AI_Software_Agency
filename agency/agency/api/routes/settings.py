@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from agency.api.deps import DbSession
+from agency.api.deps import CurrentUser, DbSession
 from agency.schemas.settings import (
     ProviderConfigIn,
     SettingsIn,
@@ -17,18 +17,22 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 @router.get("/llm", response_model=SettingsOut)
-async def get_llm_settings(session: DbSession) -> SettingsOut:
+async def get_llm_settings(session: DbSession, user: CurrentUser) -> SettingsOut:
     return await settings_service.get_settings_out(session)
 
 
 @router.put("/llm", response_model=SettingsOut)
-async def update_llm_settings(payload: SettingsIn, session: DbSession) -> SettingsOut:
+async def update_llm_settings(
+    payload: SettingsIn, session: DbSession, user: CurrentUser
+) -> SettingsOut:
     await settings_service.update_settings(session, payload)
     return await settings_service.get_settings_out(session)
 
 
 @router.post("/llm/test", response_model=TestProviderOut)
-async def test_provider(payload: ProviderConfigIn) -> TestProviderOut:
+async def test_provider(
+    payload: ProviderConfigIn, user: CurrentUser
+) -> TestProviderOut:
     """Validate the provider SDK + API key are usable without a live call."""
     from agency.llm import adapters
 

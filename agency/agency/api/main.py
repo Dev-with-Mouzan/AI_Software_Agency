@@ -33,10 +33,16 @@ logger = logging.getLogger(__name__)
 async def lifespan(_: FastAPI):
     configure_logging()
     settings = get_settings()
-    if settings.environment == "production" and not settings.api_token:
-        raise RuntimeError(
-            "API_TOKEN must be set when ENVIRONMENT=production — refusing to start unauthenticated."
-        )
+    if settings.environment == "production":
+        if not settings.api_token:
+            raise RuntimeError(
+                "API_TOKEN must be set when ENVIRONMENT=production — refusing to start unauthenticated."
+            )
+        if settings.jwt_secret == "devpilot-dev-insecure-secret-change-me":
+            raise RuntimeError(
+                "JWT_SECRET must be set to a real secret when ENVIRONMENT=production — "
+                "refusing to start with the insecure dev default."
+            )
     await init_db()
     # Register employees (idempotent) and load persisted LLM settings.
     async with get_session_factory()() as session:
@@ -98,18 +104,22 @@ def create_app() -> FastAPI:
             },
         )
 
-    app.include_router(routes.health.router, prefix="/api", dependencies=[Auth])
-    app.include_router(routes.projects.router, prefix="/api", dependencies=[Auth])
-    app.include_router(routes.workspace.router, prefix="/api", dependencies=[Auth])
-    app.include_router(routes.tasks.router, prefix="/api", dependencies=[Auth])
-    app.include_router(routes.agents.router, prefix="/api", dependencies=[Auth])
-    app.include_router(routes.chat.router, prefix="/api", dependencies=[Auth])
-    app.include_router(routes.memory.router, prefix="/api", dependencies=[Auth])
-    app.include_router(routes.workflows.router, prefix="/api", dependencies=[Auth])
-    app.include_router(routes.deployment.router, prefix="/api", dependencies=[Auth])
-    app.include_router(routes.notifications.router, prefix="/api", dependencies=[Auth])
-    app.include_router(routes.settings.router, prefix="/api", dependencies=[Auth])
-    app.include_router(routes.audit.router, prefix="/api", dependencies=[Auth])
+    # Public routers: health checks and auth. The agent roster/runtime GETs are
+    # also public (guest browsing); every other endpoint enforces JWT auth via
+    # CurrentUser + project ownership per-route.
+    app.include_router(routes.health.router, prefix="/api")
+    app.include_router(routes.auth.router, prefix="/api")
+    app.include_router(routes.projects.router, prefix="/api")
+    app.include_router(routes.workspace.router, prefix="/api")
+    app.include_router(routes.tasks.router, prefix="/api")
+    app.include_router(routes.agents.router, prefix="/api")
+    app.include_router(routes.chat.router, prefix="/api")
+    app.include_router(routes.memory.router, prefix="/api")
+    app.include_router(routes.workflows.router, prefix="/api")
+    app.include_router(routes.deployment.router, prefix="/api")
+    app.include_router(routes.notifications.router, prefix="/api")
+    app.include_router(routes.settings.router, prefix="/api")
+    app.include_router(routes.audit.router, prefix="/api")
 
     @app.get("/metrics")
     async def metrics(_: None = Auth) -> Response:

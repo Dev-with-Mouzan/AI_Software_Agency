@@ -40,6 +40,7 @@ class ProjectService:
         slug: str | None = None,
         actor: str = "human",
         workspace_mode: str = "structured",
+        owner_id: UUID | None = None,
     ) -> Project:
         settings = get_settings()
         final_slug = ProjectService.validate_slug(slug or ProjectService.slugify(name))
@@ -53,6 +54,7 @@ class ProjectService:
         if not root.is_relative_to(settings.working_area.resolve()):
             raise ValueError(f"project path escapes the working area: {root}")
         project = Project(
+            owner_id=owner_id,
             name=name,
             slug=final_slug,
             description=description,
@@ -87,9 +89,18 @@ class ProjectService:
         return await session.get(Project, project_id)
 
     @staticmethod
-    async def list(session: AsyncSession) -> list[Project]:
+    async def get_by_slug(session: AsyncSession, slug: str) -> Project | None:
+        return await session.scalar(select(Project).where(Project.slug == slug))
+
+    @staticmethod
+    async def list(
+        session: AsyncSession, owner_id: UUID | None = None
+    ) -> list[Project]:
+        stmt = select(Project)
+        if owner_id is not None:
+            stmt = stmt.where(Project.owner_id == owner_id)
         return list(
-            (await session.scalars(select(Project).order_by(Project.created_at.desc()))).all()
+            (await session.scalars(stmt.order_by(Project.created_at.desc()))).all()
         )
 
     @staticmethod
